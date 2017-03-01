@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Dota 2 Blacklist - Home</title>
+    <link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+
+<body>
+    <nav>
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="settings.html">Settings</a></li>
+            <li><a href="manager.html">Manager</a></li>
+        </ul>
+    </nav>
+    <section>
+        <header>
+            <h3>Dota 2 Blacklist</h3>
+        </header>
+        <div id="radiantPlayers">
+        </div>
+        <div id="direPlayers">
+        </div>
+    </section>
+    <script>
+        //Modules
+        const fs = require('fs');
+
+        const moment = require('moment');
+
+        const chokidar = require('chokidar');
+
+        const SteamApi = require('steam-api');
+
+        const SteamID = require('steamid');
+
+        const request = require('request');
+
+        const remote = require('electron').remote;
+
+        const spawn = require('child_process').spawn;
+
+        const child_process = require('child_process');
+
+        //Load settings and players
+        var contents = fs.readFileSync("./settings.json", 'utf-8');
+        var settings = JSON.parse(contents);
+
+        var contents = fs.readFileSync("./playerlist.json", 'utf-8');
+        var playerblacklist = JSON.parse(contents);
+
+        var steamapikey = settings.SteamAPIKey;
+        var server_log = settings.Server_Log;
+        var voice_ban = settings.Voice_Ban;
+        var audio_alerts = settings.Audio_Alerts;
+        var dodge_boosters_enemy_team = settings.Dodge_Boosters_Enemy_Team;
+        var dodge_friends_enemy_team = settings.Dodge_Friends_Enemy_Team;
+        var dodge_buyers_same_team = settings.Dodge_Buyers_Same_Team;
+
+        var myAccount = -1;
+        var myTeam = -1;
+
+        //Convert voice_ban.dt into a valid json list
+        var contents = fs.readFileSync(voice_ban, 'utf-8');
+
+        contents = contents.replace(/\x22\x0a\x7b/g, "\x22\x3a\x0a\x7b");
+        contents = contents.replace(/\x22\x0a\x09\x7b/g, "\x22\x3a\x0a\x09\x7b");
+        contents = contents.replace(/\x22\x0a\x09\x09\x7b/g, "\x22\x3a\x0a\x09\x09\x7b");
+        contents = contents.replace(/\x22\x0a\x09\x09\x7b/g, "\x22\x3a\x0a\x09\x09\x7b");
+        contents = contents.replace(/\x22\x09\x09\x22/g, "\x22\x09\x3a\x09\x22");
+        contents = contents.replace(/\x22\x0a\x09\x09\x09\x22/g, "\x22\x2c\x0a\x09\x09\x09\x22");
+        contents = contents.replace(/\x7d\x0a\x09\x09\x22/g, "\x7d\x2c\x0a\x09\x09\x22");
+
+        var playersInGame = [];
+        var radiantPlayers = [];
+        var direPlayers = [];
+
+        function newBlankPlayer() {
+            return {
+                name: undefined,
+                muted: undefined,
+                team: undefined,
+                index: undefined,
+                type: undefined,
+                steamid: undefined,
+            };
+        }
+
+        for (let i = 0; i < playersInGame.length; i++) {
+            radiantPlayers[i] = newBlankPlayer();
+        }
+
+        for (let i = 0; i < playersInGame.length; i++) {
+            direPlayers[i] = newBlankPlayer();
+        }
+
+        var contents = "{\x0a" + contents + "\x0a}";
+
+        var muted_players = JSON.parse(contents);
+
+        //Reloads the page whenever the server_log file is changed
+        function StartWatcher(path) {
+            var chokidar = require("chokidar");
+
+            var watcher = chokidar.watch(path, {
+                ignored: /[\/\\]\./,
+                persistent: true
+            });
+
+            function onWatcherReady() {
+                console.info('From here can you check for real changes, the initial scan has been completed.');
+            }
+
+            // Declare the listeners of the watcher
+            watcher
+                .on('add', function(path) {
+                    console.log('File', path, 'has been added');
+                })
+                .on('addDir', function(path) {
+                    console.log('Directory', path, 'has been added');
+                })
+                .on('change', function(path) {
+                    console.log('File', path, 'has been changed');
+                })
+                .on('unlink', function(path) {
+                    console.log('File', path, 'has been removed');
+                })
+                .on('unlinkDir', function(path) {
+                    console.log('Directory', path, 'has been removed');
+                })
+                .on('error', function(error) {
+                    console.log('Error happened', error);
+                })
+                .on('ready', onWatcherReady)
+                .on('raw', function(event, path, details) {
+                    // This event should be triggered everytime something happens.
+                    if (event == 'change') {
+                        location.reload();
+                    }
+                    console.log('Raw event info:', event, path, details);
+                });
+        }
+
+        function parseServerLog() {
+            findLast = true;
+            let lines = [];
+            fs.readFileSync(server_log).toString().split("\n").forEach(function(line) {
+                if (line === '') return;
+                lines.push(line);
+            });
+            if (lines.length == 0) return [];
+            if (findLast) {
+                for (let i = lines.length - 1; i >= 0; i--) {
+                    let line = lines[i];
+                    let steamIds = parseServerLogLine(line);
+                    if (steamIds.length > 0) return steamIds;
+                }
+                return [];
+            } else {
+                let lastLine = lines[lines.length - 1];
+                return parseServerLogLine(lastLine);
+            }
+        }
+
+        function parseServerLogLine(line) {
+            let regex = /(.*?) - (.*?): (.*?) \(Lobby (\d+) (\w+) (.*?)\)/;
+            let match = line.match(regex);
+            if (match === null || match.length != 7) return [];
+            let date = match[1];
+            let time = match[2];
+            let server = match[3];
+            let lobbyId = match[4];
+            let gameMode = match[5];
+            let playersString = match[6];
+            let matchDatetime = moment(date + ' ' + time, 'MM/DD/YYYY HH:mm:ss');
+            let secondsDiff = moment().diff(matchDatetime, 'seconds');
+            let playersRegex = /\d:(\[U:\d:\d+])/g;
+            let playersMatch;
+            let steamIds = [];
+            while (playersMatch = playersRegex.exec(playersString)) {
+                let sid = playersMatch[1];
+                steamIds.push(sid);
+            }
+            return steamIds;
+        }
+
+        function renderMain() {
+            let players = [];
+            players = parseServerLog();
+
+            let steamIds = [];
+
+            var div = document.getElementById('displayPlayers');
+
+            var html = "";
+
+            let steamId64s = [];
+
+            html = "<p>Waiting for new status.</p>";
+
+            if (players.length > 0) {
+                for (var i = 0; i < players.length; i++) {
+
+                    var prop = players[i];
+                    let sid = new SteamID(prop);
+                    steamIds.push(sid);
+                    steamId64s.push(steamIds[i].getSteamID64());
+                    playersInGame[prop] = newBlankPlayer();
+
+                    if (playerblacklist[prop]) {
+
+                        if (playerblacklist[prop].type == 0) {
+                            if (i < players.length / 2) {
+                                myTeam = 0;
+                            } else {
+                                myTeam = 1;
+                            }
+                        } else if (playerblacklist[prop].type == 1) {
+                            let tempTeam = -1;
+                            if (i < players.length / 2) {
+                                tempTeam = 0;
+                            } else {
+                                tempTeam = 1;
+                            }
+
+                            if (dodge_friends_enemy_team == true && (myTeam != tempTeam)) {
+                                dodgeTheGame();
+                            }
+
+                        } else if (playerblacklist[prop].type == 2) {
+                            let tempTeam = -1;
+                            if (i < players.length / 2) {
+                                tempTeam = 0;
+                            } else {
+                                tempTeam = 1;
+                            }
+
+                            if (dodge_buyers_same_team == true && (myTeam == tempTeam)) {
+                                dodgeTheGame();
+                            }
+
+                        } else if (playerblacklist[prop].type == 3) {
+                            let tempTeam = -1;
+                            if (i < players.length / 2) {
+                                tempTeam = 0;
+                            } else {
+                                tempTeam = 1;
+                            }
+
+                            if (dodge_boosters_enemy_team == true && (myTeam != tempTeam)) {
+                                dodgeTheGame();
+                            }
+
+                        }
+
+                    }
+
+
+
+                    if (i < players.length / 2) {
+                        playersInGame[prop].team = 0;
+                    } else {
+                        playersInGame[prop].team = 1;
+                    }
+
+                    playersInGame[prop].playerIndex = i;
+
+                }
+
+                request.get('http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=' + steamapikey + '&steamids=' + steamId64s.join(), (err, res, body) => {
+                    if (err) {
+                        console.log(err);
+                        return callback(null);
+                    }
+                    if (res.statusCode != 200) {
+                        console.log(res.statusCode, body);
+                        return callback(null);
+                    }
+                    playerData = JSON.parse(body);
+                    renderPlayers(playerData.response.players);
+                });
+
+            }
+
+
+        }
+
+        function renderPlayers(arr) {
+
+            for (let i = 0; i < arr.length; i++) {
+                let sid = new SteamID(arr[i].steamid);
+                player = sid.getSteam3RenderedID();
+
+                playersInGame[player].steamid = arr[i].steamid;
+
+                playersInGame[player].name = arr[i].personaname;
+                if (arr[i].loccountrycode) {
+                    playersInGame[player].country = arr[i].loccountrycode.toLowerCase();
+                }
+                if (playerblacklist[player]) {
+                    playersInGame[player].type = playerblacklist[player].type;
+                }
+                if (muted_players.Ban.users[player]) {
+                    playersInGame[player].muted = muted_players.Ban.users[player];
+                }
+
+                if (playersInGame[player].playerIndex < 5) {
+                    let j = playersInGame[player].playerIndex;
+                    radiantPlayers[j] = playersInGame[player];
+                } else {
+                    let j = playersInGame[player].playerIndex - 5;
+                    direPlayers[j] = playersInGame[player];
+                }
+
+
+            }
+            if (arr.length > 0) {
+                insertPlayersToTable();
+            }
+
+
+
+        }
+
+        function insertPlayersToTable() {
+
+            var divRadiant = document.getElementById('radiantPlayers');
+            var divDire = document.getElementById('direPlayers');
+
+            var html = "<p>Radiant</p>";
+            html = "<table><tr><td><font color='#b54403'>Name</font></td><td><font color='#b54403'>Mute Status</font></td><td><font color='#b54403'>Country</font></td><td><font color='#b54403'>Report Status</font></td><td><font color='#b54403'>SteamID64</font></td></tr>";
+
+            for (let i = 0; i < radiantPlayers.length; i++) {
+                html = html + "<tr><td>" + radiantPlayers[i].name + "</td>";
+                if (radiantPlayers[i].muted) {
+                    if (radiantPlayers[i].muted == "1") {
+                        html = html + "<td>Voice Muted</td>";
+                    } else if (radiantPlayers[i].muted == "2") {
+                        html = html + "<td>Chat Muted</td>";
+                    } else if (radiantPlayers[i].muted == "3") {
+                        html = html + "<td>Voice and Chat Muted</td>";
+                    }
+                } else {
+                    html = html + "<td>None</td>";
+                }
+                if (radiantPlayers[i].country) {
+                    html = html + "<td><img src='http://community.edgecast.steamstatic.com/public/images/countryflags/" + radiantPlayers[i].country + ".gif'></img></td>";
+                } else {
+                    html = html + "<td></td>";
+                }
+
+                if (radiantPlayers[i].type != null) {
+                    if (radiantPlayers[i].type == 0) {
+                        html = html + "<td><font color='yellow'>Own Account</font></td>";
+                    } else if (radiantPlayers[i].type == 1) {
+                        html = html + "<td><font color='cyan'>Friend</font></td>";
+                    } else if (radiantPlayers[i].type == 2) {
+                        html = html + "<td><font color='red'>Account Buyer</font></td>";
+                    } else if (radiantPlayers[i].type == 3) {
+                        html = html + "<td><font color='red'>Booster</font></td>";
+                    }
+                } else {
+                    html = html + "<td></td>";
+                }
+
+                html = html + "<td>" + radiantPlayers[i].steamid + "</td>";
+
+                html = html + "</tr>";
+            }
+
+            html = html + "</table>";
+            divRadiant.innerHTML = html;
+
+            var html = "<p>Dire</p>";
+            html = "<table><tr><td><font color='#b54403'>Name</font></td><td><font color='#b54403'>Mute Status</font></td><td><font color='#b54403'>Country</font></td><td><font color='#b54403'>Report Status</font></td><td><font color='#b54403'>SteamID64</font></td></tr>";
+
+            for (let i = 0; i < direPlayers.length; i++) {
+                html = html + "<tr><td>" + direPlayers[i].name + "</td>";
+                if (direPlayers[i].muted) {
+                    if (direPlayers[i].muted == "1") {
+                        html = html + "<td>Voice Muted</td>";
+                    } else if (direPlayers[i].muted == "2") {
+                        html = html + "<td>Chat Muted</td>";
+                    } else if (direPlayers[i].muted == "3") {
+                        html = html + "<td>Voice and Chat Muted</td>";
+                    }
+                } else {
+                    html = html + "<td>None</td>";
+                }
+                if (direPlayers[i].country) {
+                    html = html + "<td><img src='http://community.edgecast.steamstatic.com/public/images/countryflags/" + direPlayers[i].country + ".gif'></img></td>"
+                } else {
+                    html = html + "<td></td>";
+                }
+
+                if (direPlayers[i].type != null) {
+                    if (direPlayers[i].type == 0) {
+                        html = html + "<td><font color='yellow'>Own Account</font></td>";
+                    } else if (direPlayers[i].type == 1) {
+                        html = html + "<td><font color='cyan'>Friend</font></td>";
+                    } else if (direPlayers[i].type == 2) {
+                        html = html + "<td><font color='red'>Account Buyer</font></td>";
+                    } else if (direPlayers[i].type == 3) {
+                        html = html + "<td><font color='red'>Booster</font></td>";
+                    }
+                } else {
+                    html = html + "<td></td>";
+                }
+
+                html = html + "<td>" + direPlayers[i].steamid + "</td>";
+
+                html = html + "</tr>";
+            }
+
+            html = html + "</table>";
+            divDire.innerHTML = html;
+
+        }
+
+        function dodgeTheGame() {
+            var spawn = child_process.exec('cmd.exe /c "taskkill /f /im dota2.exe"', function(err, stdout, stderr) {
+                if (err) {
+                    console.error(err);
+                    var msg = new SpeechSynthesisUtterance('The game is not running');
+                    window.speechSynthesis.speak(msg);
+                    return;
+                }
+                console.log(stdout);
+                var msg = new SpeechSynthesisUtterance('Game dodged, close the app, open the game and relaunch the app');
+                window.speechSynthesis.speak(msg);
+            });
+        }
+
+        //Runs CORE
+        renderMain();
+        //Initializes watcher
+        StartWatcher(server_log);
+    </script>
+</body>
+
+</html>

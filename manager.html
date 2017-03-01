@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Dota 2 Blacklist - Manager</title>
+    <link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+
+<body>
+    <nav>
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="settings.html">Settings</a></li>
+            <li><a href="manager.html">Manager</a></li>
+        </ul>
+    </nav>
+    <section>
+        <header>
+            <h3>Manager</h3>
+        </header>
+        <table>
+            <tr>
+                <td>
+                    Player ID
+                </td>
+                <td>
+                    Type
+                </td>
+                <td>
+                    Notes
+                </td>
+                <td>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <input type="text" id="playerid" />
+                </td>
+
+                <td>
+                    <select id="type">
+                      <option>My Account</option>
+                      <option>Friend</option>
+                      <option>Account Buyer</option>
+                      <option>Booster</option>
+                    </select>
+                </td>
+
+                <td>
+                    <input type="text" id="notes" />
+                </td>
+
+                <td>
+                    <input type="button" onclick="addEntry()" value="Add Entry" />
+                </td>
+            </tr>
+        </table>
+
+        <p>Player Entries</p>
+        <div id="playerlist">
+        </div>
+
+        <script>
+            //Modules
+            const fs = require('fs');
+
+            const moment = require('moment');
+
+            const chokidar = require('chokidar');
+
+            const SteamApi = require('steam-api');
+
+            const SteamID = require('steamid');
+
+            const request = require('request');
+
+            const remote = require('electron').remote;
+
+            var contents = fs.readFileSync("./settings.json", 'utf-8');
+
+            var settings = JSON.parse(contents);
+
+            var steamapikey = settings.SteamAPIKey;
+            var server_log = settings.Server_Log;
+            var voice_ban = settings.Voice_Ban;
+
+
+            //Save JSON
+            String.prototype.escapeForJson = function() {
+                return this
+                    .replace(/\b/g, "")
+                    .replace(/\f/g, "")
+                    .replace(/\\/g, "\\")
+                    .replace(/\"/g, "\\\"")
+                    .replace(/\t/g, "\\t")
+                    .replace(/\r/g, "\\r")
+                    .replace(/\n/g, "\\n")
+                    .replace(/\u2028/g, "\\u2028")
+                    .replace(/\u2029/g, "\\u2029");
+            };
+
+            function StartWatcher(path) {
+                var chokidar = require("chokidar");
+
+                var watcher = chokidar.watch(path, {
+                    ignored: /[\/\\]\./,
+                    persistent: true
+                });
+
+                function onWatcherReady() {
+                    console.info('From here can you check for real changes, the initial scan has been completed.');
+                }
+
+                // Declare the listeners of the watcher
+                watcher
+                    .on('add', function(path) {
+                        console.log('File', path, 'has been added');
+                    })
+                    .on('addDir', function(path) {
+                        console.log('Directory', path, 'has been added');
+                    })
+                    .on('change', function(path) {
+                        console.log('File', path, 'has been changed');
+                    })
+                    .on('unlink', function(path) {
+                        console.log('File', path, 'has been removed');
+                    })
+                    .on('unlinkDir', function(path) {
+                        console.log('Directory', path, 'has been removed');
+                    })
+                    .on('error', function(error) {
+                        console.log('Error happened', error);
+                    })
+                    .on('ready', onWatcherReady)
+                    .on('raw', function(event, path, details) {
+                        // This event should be triggered everytime something happens.
+                        if (event == 'change') {
+                            location.reload();
+                        }
+                        console.log('Raw event info:', event, path, details);
+                    });
+            }
+
+
+            //Core
+            function addEntry() {
+                var contents = fs.readFileSync("./playerlist.json", 'utf-8');
+                var json = JSON.parse(contents);
+                var playerid = document.getElementById("playerid").value;
+
+                let sid = new SteamID(playerid);
+
+                var type = document.getElementById("type").selectedIndex;
+                var notes = document.getElementById("notes").value;
+                json[sid.getSteam3RenderedID()] = {
+                    type: type,
+                    notes: notes
+                };
+                fs.writeFileSync("./playerlist.json", JSON.stringify(json));
+            }
+
+            function renderMain() {
+                var contents = fs.readFileSync("./playerlist.json", 'utf-8');
+                var json = JSON.parse(contents);
+                var ids = [];
+                var ids64 = [];
+                var count = 0;
+                for (var player in json) {
+                    let id = new SteamID(player);
+                    ids.push(id);
+                    ids64.push(id.getSteamID64());
+                }
+                request.get('http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=' + steamapikey + '&steamids=' + ids64.join(), (err, res, body) => {
+                    if (err) {
+                        console.log(err);
+                        return callback(null);
+                    }
+                    if (res.statusCode != 200) {
+                        console.log(res.statusCode, body);
+                        return callback(null);
+                    }
+                    playerData = JSON.parse(body);
+                    renderPlayers(playerData.response.players);
+                });
+            }
+
+            function renderPlayers(arr) {
+                var playerlist = document.getElementById("playerlist");
+                var html = "";
+                var contents = fs.readFileSync("./playerlist.json", 'utf-8');
+                var json = JSON.parse(contents);
+                var html = "<table><tr><td>Name</td><td>Type</td><td>Notes</td><td>Delete</td></tr><tr></tr>";
+                for (let i = 0; i < arr.length; i++) {
+                    html = html + "<tr>";
+                    html = html + "<td>" + arr[i].personaname + "</td>";
+                    let sid = new SteamID(arr[i].steamid);
+                    player = sid.getSteam3RenderedID();
+                    if (json[player]["type"] == 0) {
+                        html = html + "<td><font color='yellow'>Own Account</font></td>";
+                    } else if (json[player]["type"] == 1) {
+                        html = html + "<td><font color='cyan'>Friend</font></td>";
+                    } else if (json[player]["type"] == 2) {
+                        html = html + "<td><font color='red'>Account Buyer</font></td>";
+                    } else if (json[player]["type"] == 3) {
+                        html = html + "<td><font color='red'>Booster</font></td>";
+                    }
+
+                    let txt = json[player]["notes"];
+                    if (txt == null) {
+                        txt = "";
+                    }
+
+                    html = html + "<td>" + txt + "</td>";
+
+                    html = html + "<td><input type='button' value='Delete' onclick='deleteEntry(\"" + player + "\")'/></td>";
+
+                    html = html + "</tr>"
+
+                }
+                html = html + "</table>";
+
+                playerlist.innerHTML = html;
+            }
+
+            function deleteEntry(id) {
+                var contents = fs.readFileSync("./playerlist.json", 'utf-8');
+                var json = JSON.parse(contents);
+                delete json[id];
+                fs.writeFileSync("./playerlist.json", JSON.stringify(json));
+            }
+
+            renderMain();
+
+            StartWatcher("./playerlist.json");
+        </script>
+
+    </section>
+</body>
+
+</html>

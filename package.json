@@ -1,0 +1,29 @@
+{
+  "name": "dota2blacklist",
+  "version": "1.0.0",
+  "description": "\u0016Blacklist players and dodge games.",
+  "main": "index.js",
+  "scripts": {
+    "test": "",
+	"start": "electron ."
+  },
+  "author": "HAWGT",
+  "license": "ISC",
+  "dependencies": {
+    "chokidar": "^1.6.1",
+    "electron": "^1.4.15",
+    "electron-json-storage": "^3.0.1",
+    "moment": "^2.17.1",
+    "request": "^2.79.0",
+    "steam-api": "^1.1.3",
+    "steamid": "^1.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/R4TH4CK3R/dota2blacklist.git"
+  },
+  "bugs": {
+    "url": "https://github.com/R4TH4CK3R/dota2blacklist/issues"
+  },
+  "homepage": "https://github.com/R4TH4CK3R/dota2blacklist#readme"
+}
