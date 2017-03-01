@@ -330,7 +330,8 @@
             var divDire = document.getElementById('direPlayers');
 
             var html = "<p>Radiant</p>";
-            html = "<table><tr><td><font color='#b54403'>Name</font></td><td><font color='#b54403'>Mute Status</font></td><td><font color='#b54403'>Country</font></td><td><font color='#b54403'>Report Status</font></td><td><font color='#b54403'>SteamID64</font></td></tr>";
+            html =
+                "<table><tr><td><font color='#b54403'>Name</font></td><td><font color='#b54403'>Mute Status</font></td><td><font color='#b54403'>Country</font></td><td><font color='#b54403'>Report Status</font></td><td><font color='#b54403'>SteamID64</font></td></tr>";
 
             for (let i = 0; i < radiantPlayers.length; i++) {
                 html = html + "<tr><td>" + radiantPlayers[i].name + "</td>";
@@ -374,7 +375,8 @@
             divRadiant.innerHTML = html;
 
             var html = "<p>Dire</p>";
-            html = "<table><tr><td><font color='#b54403'>Name</font></td><td><font color='#b54403'>Mute Status</font></td><td><font color='#b54403'>Country</font></td><td><font color='#b54403'>Report Status</font></td><td><font color='#b54403'>SteamID64</font></td></tr>";
+            html =
+                "<table><tr><td><font color='#b54403'>Name</font></td><td><font color='#b54403'>Mute Status</font></td><td><font color='#b54403'>Country</font></td><td><font color='#b54403'>Report Status</font></td><td><font color='#b54403'>SteamID64</font></td></tr>";
 
             for (let i = 0; i < direPlayers.length; i++) {
                 html = html + "<tr><td>" + direPlayers[i].name + "</td>";
@@ -423,13 +425,17 @@
             var spawn = child_process.exec('cmd.exe /c "taskkill /f /im dota2.exe"', function(err, stdout, stderr) {
                 if (err) {
                     console.error(err);
-                    var msg = new SpeechSynthesisUtterance('The game is not running');
-                    window.speechSynthesis.speak(msg);
+                    if (audio_alerts == true) {
+                        var msg = new SpeechSynthesisUtterance('The game is not running');
+                        window.speechSynthesis.speak(msg);
+                    }
                     return;
                 }
                 console.log(stdout);
-                var msg = new SpeechSynthesisUtterance('Game dodged, close the app, open the game and relaunch the app');
-                window.speechSynthesis.speak(msg);
+                if (audio_alerts == true) {
+                    var msg = new SpeechSynthesisUtterance('Game dodged, close the app, open the game and relaunch the app');
+                    window.speechSynthesis.speak(msg);
+                }
             });
         }
 
