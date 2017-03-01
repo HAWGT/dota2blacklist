@@ -190,7 +190,7 @@
                 var html = "";
                 var contents = fs.readFileSync("./playerlist.json", 'utf-8');
                 var json = JSON.parse(contents);
-                var html = "<table><tr><td>Name</td><td>Type</td><td>Notes</td><td>Delete</td></tr><tr></tr>";
+                var html = "<table><tr><td>Name</td><td>Type</td><td>Notes</td><td>Delete</td><td>SteamID64</td></tr><tr></tr>";
                 for (let i = 0; i < arr.length; i++) {
                     html = html + "<tr>";
                     html = html + "<td>" + arr[i].personaname + "</td>";
@@ -214,6 +214,8 @@
                     html = html + "<td>" + txt + "</td>";
 
                     html = html + "<td><input type='button' value='Delete' onclick='deleteEntry(\"" + player + "\")'/></td>";
+
+                    html = html + "<td>" + arr[i].steamid + "</td>";
 
                     html = html + "</tr>"
 
