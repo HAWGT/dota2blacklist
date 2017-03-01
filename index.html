@@ -144,7 +144,7 @@
         }
 
         function parseServerLog() {
-            findLast = true;
+            findLast = false;
             let lines = [];
             fs.readFileSync(server_log).toString().split("\n").forEach(function(line) {
                 if (line === '') return;
