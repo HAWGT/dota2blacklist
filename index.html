@@ -9,12 +9,13 @@
 
 <body>
     <nav>
-        <ul>
-            <li><a href="index.html">Home</a></li>
-            <li><a href="lastmatch.html">Last Match</a></li>
-            <li><a href="manager.html">Manager</a></li>
-            <li><a href="settings.html">Settings</a></li>
-        </ul>
+      <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="lastmatch.html">Last Match</a></li>
+          <li><a href="manager.html">Manager</a></li>
+          <li><a href="mutedlist.html">Muted List</a></li>
+          <li><a href="settings.html">Settings</a></li>
+      </ul>
     </nav>
     <section>
         <header>
@@ -96,6 +97,9 @@
         contents = contents.replace(/\x22\x09\x09\x22/g, "\x22\x09\x3a\x09\x22");
         contents = contents.replace(/\x22\x0a\x09\x09\x09\x22/g, "\x22\x2c\x0a\x09\x09\x09\x22");
         contents = contents.replace(/\x7d\x0a\x09\x09\x22/g, "\x7d\x2c\x0a\x09\x09\x22");
+        contents = "{\x0a" + contents + "\x0a}";
+
+        var muted_players = JSON.parse(contents);
 
         var playersInGame = [];
         var radiantPlayers = [];
@@ -122,10 +126,6 @@
         for (let i = 0; i < playersInGame.length; i++) {
             direPlayers[i] = newBlankPlayer();
         }
-
-        var contents = "{\x0a" + contents + "\x0a}";
-
-        var muted_players = JSON.parse(contents);
 
         //Reloads the page whenever the server_log file is changed
         function StartWatcher(path) {
@@ -403,7 +403,7 @@
 
             var html = "<p>Radiant</p>";
             html = html +
-                "<table><tr><td><font color='#9ef7f7'>Name</font></td><td><font color='#9ef7f7'>Mute Status</font></td><td><font color='#9ef7f7'>Country</font></td><td><font color='#9ef7f7'>Report Status</font></td><td><font color='#9ef7f7'>SteamID64</font></td><td><font color='#9ef7f7'>Estimated MMR</font></td></tr>";
+                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>SteamID64</font></th><th><font color='#9ef7f7'>Estimated MMR</font></th></tr></thead>";
 
             for (let i = 0; i < radiantPlayers.length; i++) {
                 html += "<tr><td>" + radiantPlayers[i].name + "</td>";
@@ -456,7 +456,7 @@
 
             var html = "<p>Dire</p>";
             html = html +
-                "<table><tr><td><font color='#9ef7f7'>Name</font></td><td><font color='#9ef7f7'>Mute Status</font></td><td><font color='#9ef7f7'>Country</font></td><td><font color='#9ef7f7'>Report Status</font></td><td><font color='#9ef7f7'>SteamID64</font></td><td><font color='#9ef7f7'>Estimated MMR</font></td></tr>";
+                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>SteamID64</font></th><th><font color='#9ef7f7'>Estimated MMR</font></th></tr></thead>";
 
             for (let i = 0; i < direPlayers.length; i++) {
                 html += "<tr><td>" + direPlayers[i].name + "</td>";
@@ -534,7 +534,7 @@
 
                 html = "<p>Global Stats<p>";
                 html +=
-                    "<table><tr><td><font color='#9ef7f7'>Team</font></td><td><font color='#9ef7f7'>Average MMR</font></td><td><font color='#9ef7f7'>Chance to win</font></td><td><font color='#9ef7f7'>Possible MMR gain</font></td></td><td><font color='#9ef7f7'>Possible MMR loss</font></td><td><font color='#9ef7f7'>Acceptable?</font></td></tr>";
+                    "<table><thead><tr><th><font color='#9ef7f7'>Team</font></th><th><font color='#9ef7f7'>Average MMR</font></th><th><font color='#9ef7f7'>Chance to win</font></th><th><font color='#9ef7f7'>Possible MMR gain</font></th></th><th><font color='#9ef7f7'>Possible MMR loss</font></th><th><font color='#9ef7f7'>Acceptable?</font></th></tr></thead>";
                 html += "<tr><td>Radiant</td><td>" + parseFloat(totalRadiantMMR / countRadiantMMR) + "</td><td>" + parseFloat(factorE * 100).toFixed(2) + "%</td><td>" + parseInt(factorG) + "</td><td>" + parseInt(factorH) + "</td><td></td></tr>";
                 html += "<tr><td>Dire</td><td>" + parseFloat(totalDireMMR / countDireMMR) + "</td><td>" + parseFloat(factorF * 100).toFixed(2) + "%</td><td>" + parseInt(factorI) + "</td><td>" + parseInt(factorJ) + "</td><td></td></tr>";
                 html += "<tr><td>Both Teams</td><td>" + parseFloat(gameAvgMMR) + "</td><td></td><td></td><td></td><td>" + acceptableStr + "</td></tr>";

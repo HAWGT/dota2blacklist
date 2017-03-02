@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Dota 2 Blacklist - Muted List</title>
+    <link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+
+<body>
+    <nav>
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="lastmatch.html">Last Match</a></li>
+            <li><a href="manager.html">Manager</a></li>
+            <li><a href="mutedlist.html">Muted List</a></li>
+            <li><a href="settings.html">Settings</a></li>
+        </ul>
+    </nav>
+    <section>
+        <header>
+            <h3>Muted List</h3>
+            <h5>This doesn't resolve usernames by default, because it is most likely a big list and your key will probably get blacklisted by Valve.</h5>
+        </header>
+        <div id="mutelist">
+        </div>
+
+        <script>
+            //Modules
+            const fs = require('fs');
+
+            const moment = require('moment');
+
+            const chokidar = require('chokidar');
+
+            const SteamApi = require('steam-api');
+
+            const SteamID = require('steamid');
+
+            const request = require('request');
+
+            const async = require('async');
+
+            const remote = require('electron').remote;
+
+            const spawn = require('child_process').spawn;
+
+            const child_process = require('child_process');
+
+            var co = require('co');
+            var monk = require('monk');
+            var should = require('should');
+            var wrap = require('co-monk');
+            var db = monk('localhost/testers');
+            var users = wrap(db.get('users'));
+
+            //Load settings and players
+            var contents = fs.readFileSync("./settings.json", 'utf-8');
+            var settings = JSON.parse(contents);
+
+            var contents = fs.readFileSync("./playerlist.json", 'utf-8');
+            var playerblacklist = JSON.parse(contents);
+
+            var steamapikey = settings.SteamAPIKey;
+            var server_log = settings.Server_Log;
+            var voice_ban = settings.Voice_Ban;
+            var audio_alerts = settings.Audio_Alerts;
+            var dodge_boosters_enemy_team = settings.Dodge_Boosters_Enemy_Team;
+            var dodge_friends_enemy_team = settings.Dodge_Friends_Enemy_Team;
+            var dodge_buyers_same_team = settings.Dodge_Buyers_Same_Team;
+            var min_mmr = settings.Min_MMR;
+            var max_mmr = settings.Max_MMR;
+
+            //Convert voice_ban.dt into a valid json list
+            var contents = fs.readFileSync(voice_ban, 'utf-8');
+
+            contents = contents.replace(/\x22\x0a\x7b/g, "\x22\x3a\x0a\x7b");
+            contents = contents.replace(/\x22\x0a\x09\x7b/g, "\x22\x3a\x0a\x09\x7b");
+            contents = contents.replace(/\x22\x0a\x09\x09\x7b/g, "\x22\x3a\x0a\x09\x09\x7b");
+            contents = contents.replace(/\x22\x0a\x09\x09\x7b/g, "\x22\x3a\x0a\x09\x09\x7b");
+            contents = contents.replace(/\x22\x09\x09\x22/g, "\x22\x09\x3a\x09\x22");
+            contents = contents.replace(/\x22\x0a\x09\x09\x09\x22/g, "\x22\x2c\x0a\x09\x09\x09\x22");
+            contents = contents.replace(/\x7d\x0a\x09\x09\x22/g, "\x7d\x2c\x0a\x09\x09\x22");
+            contents = "{\x0a" + contents + "\x0a}";
+
+            var muted_players = JSON.parse(contents);
+
+            //Reloads the page whenever the server_log file is changed
+            function StartWatcher(path) {
+                var chokidar = require("chokidar");
+
+                var watcher = chokidar.watch(path, {
+                    ignored: /[\/\\]\./,
+                    persistent: true
+                });
+
+                function onWatcherReady() {
+                    console.info('From here can you check for real changes, the initial scan has been completed.');
+                }
+
+                // Declare the listeners of the watcher
+                watcher
+                    .on('add', function(path) {
+                        console.log('File', path, 'has been added');
+                    })
+                    .on('addDir', function(path) {
+                        console.log('Directory', path, 'has been added');
+                    })
+                    .on('change', function(path) {
+                        console.log('File', path, 'has been changed');
+                    })
+                    .on('unlink', function(path) {
+                        console.log('File', path, 'has been removed');
+                    })
+                    .on('unlinkDir', function(path) {
+                        console.log('Directory', path, 'has been removed');
+                    })
+                    .on('error', function(error) {
+                        console.log('Error happened', error);
+                    })
+                    .on('ready', onWatcherReady)
+                    .on('raw', function(event, path, details) {
+                        // This event should be triggered everytime something happens.
+                        if (event == 'change') {
+                            location.reload();
+                        }
+                        console.log('Raw event info:', event, path, details);
+                    });
+            }
+
+            function renderMain() {
+
+                var divMuteList = document.getElementById('mutelist');
+                html = "<table><thead><tr><th>SteamID64</th><th>Account/Player ID</th><th>Mute Status</th><th>Resolve Name</th></tr></thead>";
+
+                for (k in muted_players['Ban']['users']) {
+                    let sid = new SteamID(k);
+                    let flags = muted_players['Ban']['users'][k]['flags'];
+                    var str = "<td>None</td>";
+                    if (flags == "1") {
+                        str = "<td>Voice Muted</td>";
+                    } else if (flags == "2") {
+                        str = "<td>Chat Muted</td>";
+                    } else if (flags == "3") {
+                        str = "<td>Voice and Chat Muted</td>";
+                    }
+                    html += "<tr><td>" + sid.getSteamID64() + "</td><td>" + sid.accountid + "</td>" + str + "<td><input value='!' type='button' onclick='resolve(\"" + sid.getSteamID64() + "\")'/></td></tr>";
+                }
+
+                html += "</table>";
+
+                divMuteList.innerHTML = html;
+
+            }
+
+            function resolve(id) {
+
+                co(function*() {
+                    let checker = new Promise((resolve, reject) => {
+                        request.get('http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=' + steamapikey + '&steamids=' + id, (err, response, body) => {
+
+                            try {
+
+                              let playerData = JSON.parse(body);
+                              console.log(playerData);
+                              alert(playerData.response.players[0].personaname);
+
+                            } catch (ex) {
+                                reject(ex);
+                            }
+                        }, reject);
+                    });
+
+
+                    let res;
+                    try {
+                        res = yield checker;
+                    } catch (err) {
+                        console.log(err);
+                    }
+
+                });
+
+            }
+
+            renderMain();
+
+            StartWatcher(voice_ban);
+        </script>
+
+    </section>
+</body>
+
+</html>

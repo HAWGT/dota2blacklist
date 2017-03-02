@@ -3,18 +3,19 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Dota 2 Blacklist - Home</title>
+    <title>Dota 2 Blacklist - Last Match</title>
     <link rel="stylesheet" type="text/css" href="stylesheet.css">
 </head>
 
 <body>
     <nav>
-        <ul>
-            <li><a href="index.html">Home</a></li>
-            <li><a href="lastmatch.html">Last Match</a></li>
-            <li><a href="manager.html">Manager</a></li>
-            <li><a href="settings.html">Settings</a></li>
-        </ul>
+      <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="lastmatch.html">Last Match</a></li>
+          <li><a href="manager.html">Manager</a></li>
+          <li><a href="mutedlist.html">Muted List</a></li>
+          <li><a href="settings.html">Settings</a></li>
+      </ul>
     </nav>
     <section>
         <header>
@@ -26,19 +27,21 @@
         </div>
         <p>Add to blacklist</p>
         <table>
+          <thead>
             <tr>
-                <td>
+                <th>
                     <font color='#9ef7f7'>Player ID</font>
-                </td>
-                <td>
+                </th>
+                <th>
                     <font color='#9ef7f7'>Type</font>
-                </td>
-                <td>
+                </th>
+                <th>
                     <font color='#9ef7f7'>Notes</font>
-                </td>
-                <td>
+                </th>
+                <th>
                     <font color='#9ef7f7'>Add</font>
-                </td>
+                </th>
+              </thead>
             </tr>
             <tr>
                 <td>
@@ -120,6 +123,9 @@
         contents = contents.replace(/\x22\x09\x09\x22/g, "\x22\x09\x3a\x09\x22");
         contents = contents.replace(/\x22\x0a\x09\x09\x09\x22/g, "\x22\x2c\x0a\x09\x09\x09\x22");
         contents = contents.replace(/\x7d\x0a\x09\x09\x22/g, "\x7d\x2c\x0a\x09\x09\x22");
+        contents = "{\x0a" + contents + "\x0a}";
+
+        var muted_players = JSON.parse(contents);
 
         var playersInGame = [];
         var radiantPlayers = [];
@@ -146,10 +152,6 @@
         for (let i = 0; i < playersInGame.length; i++) {
             direPlayers[i] = newBlankPlayer();
         }
-
-        var contents = "{\x0a" + contents + "\x0a}";
-
-        var muted_players = JSON.parse(contents);
 
         //Reloads the page whenever the server_log file is changed
         function StartWatcher(path) {
@@ -328,7 +330,7 @@
 
             var html = "<p>Radiant</p>";
             html = html +
-                "<table><tr><td><font color='#9ef7f7'>Name</font></td><td><font color='#9ef7f7'>Mute Status</font></td><td><font color='#9ef7f7'>Country</font></td><td><font color='#9ef7f7'>Report Status</font></td><td><font color='#9ef7f7'>Add</font></td><td><font color='#9ef7f7'>Remove</font></td></tr>";
+                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>Add</font></th><th><font color='#9ef7f7'>Remove</font></th></tr></thead>";
 
             for (let i = 0; i < radiantPlayers.length; i++) {
                 html += "<tr><td>" + radiantPlayers[i].name + "</td>";
@@ -374,7 +376,7 @@
 
             var html = "<p>Dire</p>";
             html = html +
-                "<table><tr><td><font color='#9ef7f7'>Name</font></td><td><font color='#9ef7f7'>Mute Status</font></td><td><font color='#9ef7f7'>Country</font></td><td><font color='#9ef7f7'>Report Status</font></td><td><font color='#9ef7f7'>Add</font></td><td><font color='#9ef7f7'>Remove</font></td></tr>";
+                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>Add</font></th><th><font color='#9ef7f7'>Remove</font></th></tr></thead>";
 
             for (let i = 0; i < direPlayers.length; i++) {
                 html += "<tr><td>" + direPlayers[i].name + "</td>";

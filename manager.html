@@ -13,6 +13,7 @@
             <li><a href="index.html">Home</a></li>
             <li><a href="lastmatch.html">Last Match</a></li>
             <li><a href="manager.html">Manager</a></li>
+            <li><a href="mutedlist.html">Muted List</a></li>
             <li><a href="settings.html">Settings</a></li>
         </ul>
     </nav>
@@ -21,20 +22,22 @@
             <h3>Manager</h3>
         </header>
         <table>
-            <tr>
-              <td>
-                  <font color='#9ef7f7'>Player ID</font>
-              </td>
-              <td>
-                  <font color='#9ef7f7'>Type</font>
-              </td>
-              <td>
-                  <font color='#9ef7f7'>Notes</font>
-              </td>
-              <td>
-                  <font color='#9ef7f7'>Add</font>
-              </td>
-            </tr>
+            <thead>
+                <tr>
+                    <th>
+                        <font color='#9ef7f7'>Player ID</font>
+                    </th>
+                    <th>
+                        <font color='#9ef7f7'>Type</font>
+                    </th>
+                    <th>
+                        <font color='#9ef7f7'>Notes</font>
+                    </th>
+                    <th>
+                        <font color='#9ef7f7'>Add</font>
+                    </th>
+                </tr>
+            </thead>
             <tr>
                 <td>
                     <input type="text" id="playerid" />
@@ -192,7 +195,7 @@
                 var html = "";
                 var contents = fs.readFileSync("./playerlist.json", 'utf-8');
                 var json = JSON.parse(contents);
-                var html = "<table><tr><td>Name</td><td>Type</td><td>Notes</td><td>Delete</td><td>SteamID64</td></tr><tr></tr>";
+                var html = "<table><tr><th>Name</th><th>Type</th><th>Notes</th><th>Delete</th><th>SteamID64</th></tr><tr></tr>";
                 for (let i = 0; i < arr.length; i++) {
                     html = html + "<tr>";
                     html = html + "<td>" + arr[i].personaname + "</td>";

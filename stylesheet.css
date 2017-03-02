@@ -14,6 +14,10 @@ div td {
   width: 150px;
 }
 
+th {
+  font-weight: normal;
+}
+
 tr:nth-child(odd) {
     background-color: #81848c;
 }
