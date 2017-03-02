@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Dota 2 Blacklist - Home</title>
+    <link rel="stylesheet" type="text/css" href="stylesheet.css">
+</head>
+
+<body>
+    <nav>
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="lastmatch.html">Last Match</a></li>
+            <li><a href="manager.html">Manager</a></li>
+            <li><a href="settings.html">Settings</a></li>
+        </ul>
+    </nav>
+    <section>
+        <header>
+            <h3>Last Match</h3>
+        </header>
+        <div id="radiantPlayers">
+        </div>
+        <div id="direPlayers">
+        </div>
+        <p>Add to blacklist</p>
+        <table>
+            <tr>
+                <td>
+                    <font color='#9ef7f7'>Player ID</font>
+                </td>
+                <td>
+                    <font color='#9ef7f7'>Type</font>
+                </td>
+                <td>
+                    <font color='#9ef7f7'>Notes</font>
+                </td>
+                <td>
+                    <font color='#9ef7f7'>Add</font>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <input type="text" id="playerid" />
+                </td>
+
+                <td>
+                    <select id="type">
+                      <option>Own Account</option>
+                      <option>Friend</option>
+                      <option>Account Buyer</option>
+                      <option>Booster</option>
+                    </select>
+                </td>
+
+                <td>
+                    <input type="text" id="notes" />
+                </td>
+
+                <td>
+                    <input type="button" onclick="addEntry()" value="Add Entry" />
+                </td>
+            </tr>
+        </table>
+    </section>
+    <script>
+        //Modules
+        const fs = require('fs');
+
+        const moment = require('moment');
+
+        const chokidar = require('chokidar');
+
+        const SteamApi = require('steam-api');
+
+        const SteamID = require('steamid');
+
+        const request = require('request');
+
+        const async = require('async');
+
+        const remote = require('electron').remote;
+
+        const spawn = require('child_process').spawn;
+
+        const child_process = require('child_process');
+
+        var co = require('co');
+        var monk = require('monk');
+        var should = require('should');
+        var wrap = require('co-monk');
+        var db = monk('localhost/testers');
+        var users = wrap(db.get('users'));
+
+        //Load settings and players
+        var contents = fs.readFileSync("./settings.json", 'utf-8');
+        var settings = JSON.parse(contents);
+
+        var contents = fs.readFileSync("./playerlist.json", 'utf-8');
+        var playerblacklist = JSON.parse(contents);
+
+        var steamapikey = settings.SteamAPIKey;
+        var server_log = settings.Server_Log;
+        var voice_ban = settings.Voice_Ban;
+        var audio_alerts = settings.Audio_Alerts;
+        var dodge_boosters_enemy_team = settings.Dodge_Boosters_Enemy_Team;
+        var dodge_friends_enemy_team = settings.Dodge_Friends_Enemy_Team;
+        var dodge_buyers_same_team = settings.Dodge_Buyers_Same_Team;
+        var min_mmr = settings.Min_MMR;
+        var max_mmr = settings.Max_MMR;
+
+        //Convert voice_ban.dt into a valid json list
+        var contents = fs.readFileSync(voice_ban, 'utf-8');
+
+        contents = contents.replace(/\x22\x0a\x7b/g, "\x22\x3a\x0a\x7b");
+        contents = contents.replace(/\x22\x0a\x09\x7b/g, "\x22\x3a\x0a\x09\x7b");
+        contents = contents.replace(/\x22\x0a\x09\x09\x7b/g, "\x22\x3a\x0a\x09\x09\x7b");
+        contents = contents.replace(/\x22\x0a\x09\x09\x7b/g, "\x22\x3a\x0a\x09\x09\x7b");
+        contents = contents.replace(/\x22\x09\x09\x22/g, "\x22\x09\x3a\x09\x22");
+        contents = contents.replace(/\x22\x0a\x09\x09\x09\x22/g, "\x22\x2c\x0a\x09\x09\x09\x22");
+        contents = contents.replace(/\x7d\x0a\x09\x09\x22/g, "\x7d\x2c\x0a\x09\x09\x22");
+
+        var playersInGame = [];
+        var radiantPlayers = [];
+        var direPlayers = [];
+
+        function newBlankPlayer() {
+            return {
+                name: undefined,
+                muted: undefined,
+                team: undefined,
+                index: undefined,
+                type: undefined,
+                steamid: undefined,
+                solo_mmr: undefined,
+                party_mmr: undefined,
+                estimated_mmr: undefined,
+            };
+        }
+
+        for (let i = 0; i < playersInGame.length; i++) {
+            radiantPlayers[i] = newBlankPlayer();
+        }
+
+        for (let i = 0; i < playersInGame.length; i++) {
+            direPlayers[i] = newBlankPlayer();
+        }
+
+        var contents = "{\x0a" + contents + "\x0a}";
+
+        var muted_players = JSON.parse(contents);
+
+        //Reloads the page whenever the server_log file is changed
+        function StartWatcher(path) {
+            var chokidar = require("chokidar");
+
+            var watcher = chokidar.watch(path, {
+                ignored: /[\/\\]\./,
+                persistent: true
+            });
+
+            function onWatcherReady() {
+                console.info('From here can you check for real changes, the initial scan has been completed.');
+            }
+
+            // Declare the listeners of the watcher
+            watcher
+                .on('add', function(path) {
+                    console.log('File', path, 'has been added');
+                })
+                .on('addDir', function(path) {
+                    console.log('Directory', path, 'has been added');
+                })
+                .on('change', function(path) {
+                    console.log('File', path, 'has been changed');
+                })
+                .on('unlink', function(path) {
+                    console.log('File', path, 'has been removed');
+                })
+                .on('unlinkDir', function(path) {
+                    console.log('Directory', path, 'has been removed');
+                })
+                .on('error', function(error) {
+                    console.log('Error happened', error);
+                })
+                .on('ready', onWatcherReady)
+                .on('raw', function(event, path, details) {
+                    // This event should be triggered everytime something happens.
+                    if (event == 'change') {
+                        location.reload();
+                    }
+                    console.log('Raw event info:', event, path, details);
+                });
+        }
+
+        function parseServerLog() {
+            findLast = true;
+            let lines = [];
+            fs.readFileSync(server_log).toString().split("\n").forEach(function(line) {
+                if (line === '') return;
+                lines.push(line);
+            });
+            if (lines.length == 0) return [];
+            if (findLast) {
+                for (let i = lines.length - 1; i >= 0; i--) {
+                    let line = lines[i];
+                    let steamIds = parseServerLogLine(line);
+                    if (steamIds.length > 0) return steamIds;
+                }
+                return [];
+            } else {
+                let lastLine = lines[lines.length - 1];
+                return parseServerLogLine(lastLine);
+            }
+        }
+
+        function parseServerLogLine(line) {
+            let regex = /(.*?) - (.*?): (.*?) \(Lobby (\d+) (\w+) (.*?)\)/;
+            let match = line.match(regex);
+            if (match === null || match.length != 7) return [];
+            let date = match[1];
+            let time = match[2];
+            let server = match[3];
+            let lobbyId = match[4];
+            let gameMode = match[5];
+            let playersString = match[6];
+            let matchDatetime = moment(date + ' ' + time, 'MM/DD/YYYY HH:mm:ss');
+            let secondsDiff = moment().diff(matchDatetime, 'seconds');
+            let playersRegex = /\d:(\[U:\d:\d+])/g;
+            let playersMatch;
+            let steamIds = [];
+            while (playersMatch = playersRegex.exec(playersString)) {
+                let sid = playersMatch[1];
+                steamIds.push(sid);
+            }
+            return steamIds;
+        }
+
+        function renderMain() {
+            let players = [];
+            players = parseServerLog();
+
+            let steamIds = [];
+
+            let steamId64s = [];
+
+            playersLeft = players.length;
+
+            if (players.length > 0) {
+                for (var i = 0; i < players.length; i++) {
+
+                    var prop = players[i];
+                    let sid = new SteamID(prop);
+                    steamIds.push(sid);
+                    steamId64s.push(steamIds[i].getSteamID64());
+                    playersInGame[prop] = newBlankPlayer();
+
+
+
+                    if (i < players.length / 2) {
+                        playersInGame[prop].team = 0;
+                    } else {
+                        playersInGame[prop].team = 1;
+                    }
+
+                    playersInGame[prop].playerIndex = i;
+
+                }
+
+                request.get('http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=' + steamapikey + '&steamids=' + steamId64s.join(), (err, res, body) => {
+                    if (err) {
+                        console.log(err);
+                        return callback(null);
+                    }
+                    if (res.statusCode != 200) {
+                        console.log(res.statusCode, body);
+                        return callback(null);
+                    }
+                    playerData = JSON.parse(body);
+                    for (let i = 0; i < playerData.response.players.length; i++) {
+                        storePlayer(playerData.response.players[i]);
+                    }
+                    insertPlayersToTable();
+
+                });
+
+            }
+
+
+        }
+
+        function storePlayer(data) {
+
+
+            let sid = new SteamID(data.steamid);
+            player = sid.getSteam3RenderedID();
+
+
+            playersInGame[player].steamid = data.steamid;
+
+            playersInGame[player].name = data.personaname;
+            if (data.loccountrycode) {
+                playersInGame[player].country = data.loccountrycode.toLowerCase();
+            }
+            if (playerblacklist[player]) {
+                playersInGame[player].type = playerblacklist[player].type;
+            }
+            if (muted_players.Ban.users[player]) {
+                playersInGame[player].muted = muted_players.Ban.users[player];
+            }
+
+            if (playersInGame[player].playerIndex < 5) {
+                let j = playersInGame[player].playerIndex;
+                radiantPlayers[j] = playersInGame[player];
+            } else {
+                let j = playersInGame[player].playerIndex - 5;
+                direPlayers[j] = playersInGame[player];
+            }
+        }
+
+        function insertPlayersToTable() {
+
+            var divRadiant = document.getElementById('radiantPlayers');
+            var divDire = document.getElementById('direPlayers');
+
+            var divStats = document.getElementById('globalStats');
+
+            var html = "<p>Radiant</p>";
+            html = html +
+                "<table><tr><td><font color='#9ef7f7'>Name</font></td><td><font color='#9ef7f7'>Mute Status</font></td><td><font color='#9ef7f7'>Country</font></td><td><font color='#9ef7f7'>Report Status</font></td><td><font color='#9ef7f7'>Add</font></td><td><font color='#9ef7f7'>Remove</font></td></tr>";
+
+            for (let i = 0; i < radiantPlayers.length; i++) {
+                html += "<tr><td>" + radiantPlayers[i].name + "</td>";
+                if (radiantPlayers[i].muted) {
+                    if (radiantPlayers[i].muted == "1") {
+                        html += "<td>Voice Muted</td>";
+                    } else if (radiantPlayers[i].muted == "2") {
+                        html += "<td>Chat Muted</td>";
+                    } else if (radiantPlayers[i].muted == "3") {
+                        html += "<td>Voice and Chat Muted</td>";
+                    }
+                } else {
+                    html += "<td>None</td>";
+                }
+                if (radiantPlayers[i].country) {
+                    html += "<td><img src='http://community.edgecast.steamstatic.com/public/images/countryflags/" + radiantPlayers[i].country + ".gif'></img></td>";
+                } else {
+                    html += "<td>None</td>";
+                }
+
+                if (radiantPlayers[i].type != null) {
+                    if (radiantPlayers[i].type == 0) {
+                        html += "<td><font color='yellow'>Own Account</font></td>";
+                    } else if (radiantPlayers[i].type == 1) {
+                        html += "<td><font color='cyan'>Friend</font></td>";
+                    } else if (radiantPlayers[i].type == 2) {
+                        html += "<td><font color='red'>Account Buyer</font></td>";
+                    } else if (radiantPlayers[i].type == 3) {
+                        html += "<td><font color='red'>Booster</font></td>";
+                    }
+                } else {
+                    html += "<td>None</td>";
+                }
+
+                html += "<td><input type='button' onclick='addToTextBox(\"" + radiantPlayers[i].steamid + "\")' value='+'/></td>";
+                html += "<td><input type='button' onclick='removeFromBL(\"" + radiantPlayers[i].steamid + "\")' value='X'/></td>";
+
+                html += "</tr>";
+            }
+
+            html += "</table>";
+            divRadiant.innerHTML = html;
+
+            var html = "<p>Dire</p>";
+            html = html +
+                "<table><tr><td><font color='#9ef7f7'>Name</font></td><td><font color='#9ef7f7'>Mute Status</font></td><td><font color='#9ef7f7'>Country</font></td><td><font color='#9ef7f7'>Report Status</font></td><td><font color='#9ef7f7'>Add</font></td><td><font color='#9ef7f7'>Remove</font></td></tr>";
+
+            for (let i = 0; i < direPlayers.length; i++) {
+                html += "<tr><td>" + direPlayers[i].name + "</td>";
+                if (direPlayers[i].muted) {
+                    if (direPlayers[i].muted == "1") {
+                        html += "<td>Voice Muted</td>";
+                    } else if (direPlayers[i].muted == "2") {
+                        html += "<td>Chat Muted</td>";
+                    } else if (direPlayers[i].muted == "3") {
+                        html += "<td>Voice and Chat Muted</td>";
+                    }
+                } else {
+                    html += "<td>None</td>";
+                }
+                if (direPlayers[i].country) {
+                    html += "<td><img src='http://community.edgecast.steamstatic.com/public/images/countryflags/" + direPlayers[i].country + ".gif'></img></td>"
+                } else {
+                    html += "<td>None</td>";
+                }
+
+                if (direPlayers[i].type != null) {
+                    if (direPlayers[i].type == 0) {
+                        html += "<td><font color='yellow'>Own Account</font></td>";
+                    } else if (direPlayers[i].type == 1) {
+                        html += "<td><font color='cyan'>Friend</font></td>";
+                    } else if (direPlayers[i].type == 2) {
+                        html += "<td><font color='red'>Account Buyer</font></td>";
+                    } else if (direPlayers[i].type == 3) {
+                        html += "<td><font color='red'>Booster</font></td>";
+                    }
+                } else {
+                    html += "<td>None</td>";
+                }
+
+                html += "<td><input type='button' onclick='addToTextBox(\"" + direPlayers[i].steamid + "\")' value='+'/></td>";
+                html += "<td><input type='button' onclick='removeFromBL(\"" + direPlayers[i].steamid + "\")' value='X'/></td>";
+
+                html += "</tr>";
+            }
+
+            html += "</table>";
+            divDire.innerHTML = html;
+        }
+
+        function addToTextBox(id) {
+            document.getElementById('playerid').value = id;
+        }
+
+        function addEntry() {
+            var contents = fs.readFileSync("./playerlist.json", 'utf-8');
+            var json = JSON.parse(contents);
+            var playerid = document.getElementById("playerid").value;
+
+            let sid = new SteamID(playerid);
+
+            var type = document.getElementById("type").selectedIndex;
+            var notes = document.getElementById("notes").value;
+            json[sid.getSteam3RenderedID()] = {
+                type: type,
+                notes: notes
+            };
+            fs.writeFileSync("./playerlist.json", JSON.stringify(json));
+        }
+
+        function removeFromBL(id) {
+            let sid = new SteamID(id);
+            var contents = fs.readFileSync("./playerlist.json", 'utf-8');
+            var json = JSON.parse(contents);
+            delete json[sid.getSteam3RenderedID()];
+            fs.writeFileSync("./playerlist.json", JSON.stringify(json));
+        }
+
+
+        //Runs CORE
+        renderMain();
+        //Initializes watcher
+        StartWatcher("./playerlist.json");
+    </script>
+</body>
+
+</html>

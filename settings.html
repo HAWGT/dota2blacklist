@@ -9,11 +9,12 @@
 
 <body>
     <nav>
-        <ul>
-            <li><a href="index.html">Home</a></li>
-            <li><a href="settings.html">Settings</a></li>
-            <li><a href="manager.html">Manager</a></li>
-        </ul>
+      <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="lastmatch.html">Last Match</a></li>
+          <li><a href="manager.html">Manager</a></li>
+          <li><a href="settings.html">Settings</a></li>
+      </ul>
     </nav>
     <section>
         <header>
@@ -22,38 +23,43 @@
         <table>
             <tr>
                 <td>Steam API Key</td>
-                <td><input type="text" id="key"></td>
+                <td><input type="text" id="key" /></td>
                 <td><a href="https://steamcommunity.com/dev/apikey/" target="_blank">Get a key</a></td>
             </tr>
             <tr>
                 <td>server_log.txt</td>
-                <td><input type="text" id="server_log"></td>
+                <td><input type="text" id="server_log" /></td>
                 <td><input type="button" value="Locate server_log.txt" onclick="locateServerLog()" /></td>
             </tr>
             <tr>
                 <td>voice_ban.dt</td>
-                <td><input type="text" id="voice_ban"></td>
+                <td><input type="text" id="voice_ban" /></td>
                 <td><input type="button" value="Locate voice_ban.dt" onclick="locateVoiceBan()" /></td>
             </tr>
             <tr>
                 <td>Audio Alerts</td>
-                <td><input type="checkbox" id="alerts"></td>
+                <td><input type="checkbox" id="alerts" /></td>
                 <td><input type="button" value="?" onclick="audioTip(0)" /></td>
             </tr>
             <tr>
                 <td>Dodge account buyers (if on the same team)</td>
-                <td><input type="checkbox" id="buyers"></td>
+                <td><input type="checkbox" id="buyers" /></td>
                 <td><input type="button" value="?" onclick="audioTip(1)" /></td>
             </tr>
             <tr>
                 <td>Dodge boosters (if on the enemy team)</td>
-                <td><input type="checkbox" id="boosters"></td>
+                <td><input type="checkbox" id="boosters" /></td>
                 <td><input type="button" value="?" onclick="audioTip(2)" /></td>
             </tr>
             <tr>
                 <td>Dodge friends (if on the enemy team)</td>
-                <td><input type="checkbox" id="friends"></td>
+                <td><input type="checkbox" id="friends" /></td>
                 <td><input type="button" value="?" onclick="audioTip(3)" /></td>
+            </tr>
+            <tr>
+                <td>Dodge if average MMR outside the range of</td>
+                <td><input type="text" id="min_mmr" /></td>
+                <td><input type="text" id="max_mmr" /></td>
             </tr>
             <tr>
                 <td></td>
@@ -92,6 +98,8 @@
         var dodge_boosters_enemy_team = settings.Dodge_Boosters_Enemy_Team;
         var dodge_friends_enemy_team = settings.Dodge_Friends_Enemy_Team;
         var dodge_buyers_same_team = settings.Dodge_Buyers_Same_Team;
+        var min_mmr = settings.Min_MMR;
+        var max_mmr = settings.Max_MMR;
 
         document.getElementById("key").value = steamapikey;
         document.getElementById("server_log").value = server_log;
@@ -100,6 +108,8 @@
         document.getElementById("buyers").checked = dodge_buyers_same_team;
         document.getElementById("boosters").checked = dodge_boosters_enemy_team;
         document.getElementById("friends").checked = dodge_friends_enemy_team;
+        document.getElementById("min_mmr").value = min_mmr;
+        document.getElementById("max_mmr").value = max_mmr;
 
 
         //Save JSON
@@ -172,13 +182,15 @@
             settings.Dodge_Boosters_Enemy_Team = document.getElementById("boosters").checked;
             settings.Dodge_Buyers_Same_Team = document.getElementById("buyers").checked;
             settings.Dodge_Friends_Enemy_Team = document.getElementById("friends").checked;
+            settings.Min_MMR = document.getElementById("min_mmr").value;
+            settings.Max_MMR = document.getElementById("max_mmr").value;
 
             fs.writeFileSync("./settings.json", JSON.stringify(settings));
         }
 
         function audioTip(num) {
             if (num == 0) {
-                var msg = new SpeechSynthesisUtterance('This will alert you of important messages');
+                var msg = new SpeechSynthesisUtterance('Listen to my sexy voice everytime you dodge');
                 window.speechSynthesis.speak(msg);
             }
             if (num == 1) {
@@ -186,7 +198,7 @@
                 window.speechSynthesis.speak(msg);
             }
             if (num == 2) {
-                var msg = new SpeechSynthesisUtterance('Less chance of a smurf or an account booster stomping your team');
+                var msg = new SpeechSynthesisUtterance('Less chance of an account booster stomping your team');
                 window.speechSynthesis.speak(msg);
             }
             if (num == 3) {

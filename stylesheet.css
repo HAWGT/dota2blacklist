@@ -5,17 +5,21 @@ nav {
 
 body {
     font-family: "Tahoma";
-    background-color: #2c0847;
-    color: #08d86d;
+    background-color: white;
+    color: black;
     overflow-y: scroll;
 }
 
+div td {
+  width: 150px;
+}
+
 tr:nth-child(odd) {
-    background-color: #4209B3;
+    background-color: #81848c;
 }
 
 tr:nth-child(even) {
-    background-color: #340b84;
+    background-color: #afb1b5;
 }
 
 ::-webkit-scrollbar {
@@ -50,20 +54,20 @@ li {
 li a {
     display: block;
     padding: 8px;
-    background-color: #3443cf;
+    background-color: #596363;
     color: white;
 }
 
 li a:hover {
-    background-color: #2030bb;
-    color: yellow;
+    background-color: #b2c1c1;
+    color: cyan;
     text-decoration: none;
 }
 
 input, select, textarea {
     resize: none;
     outline: none;
-    background-color: #9242f4;
+    background-color: #767777;
     color: #FFFFFF;
     border: 2px solid #dadada;
     border-radius: 3px;

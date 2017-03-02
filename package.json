@@ -5,16 +5,21 @@
   "main": "index.js",
   "scripts": {
     "test": "",
-	"start": "electron ."
+    "start": "electron ."
   },
   "author": "HAWGT",
   "license": "ISC",
   "dependencies": {
+    "async": "^2.1.5",
     "chokidar": "^1.6.1",
+    "co": "^4.6.0",
+    "co-monk": "^1.0.0",
     "electron": "^1.4.15",
     "electron-json-storage": "^3.0.1",
     "moment": "^2.17.1",
+    "monk": "^4.0.0",
     "request": "^2.79.0",
+    "should": "^11.2.0",
     "steam-api": "^1.1.3",
     "steamid": "^1.1.0"
   },

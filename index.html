@@ -11,8 +11,9 @@
     <nav>
         <ul>
             <li><a href="index.html">Home</a></li>
-            <li><a href="settings.html">Settings</a></li>
+            <li><a href="lastmatch.html">Last Match</a></li>
             <li><a href="manager.html">Manager</a></li>
+            <li><a href="settings.html">Settings</a></li>
         </ul>
     </nav>
     <section>
@@ -22,6 +23,8 @@
         <div id="radiantPlayers">
         </div>
         <div id="direPlayers">
+        </div>
+        <div id="globalStats">
         </div>
     </section>
     <script>
@@ -38,11 +41,20 @@
 
         const request = require('request');
 
+        const async = require('async');
+
         const remote = require('electron').remote;
 
         const spawn = require('child_process').spawn;
 
         const child_process = require('child_process');
+
+        var co = require('co');
+        var monk = require('monk');
+        var should = require('should');
+        var wrap = require('co-monk');
+        var db = monk('localhost/testers');
+        var users = wrap(db.get('users'));
 
         //Load settings and players
         var contents = fs.readFileSync("./settings.json", 'utf-8');
@@ -58,9 +70,21 @@
         var dodge_boosters_enemy_team = settings.Dodge_Boosters_Enemy_Team;
         var dodge_friends_enemy_team = settings.Dodge_Friends_Enemy_Team;
         var dodge_buyers_same_team = settings.Dodge_Buyers_Same_Team;
+        var min_mmr = settings.Min_MMR;
+        var max_mmr = settings.Max_MMR;
 
         var myAccount = -1;
         var myTeam = -1;
+
+        var countRadiantMMR = 0;
+        var countDireMMR = 0;
+
+        var totalRadiantMMR = 0;
+        var totalDireMMR = 0;
+
+        var playersLeft = -1;
+
+        var done = false;
 
         //Convert voice_ban.dt into a valid json list
         var contents = fs.readFileSync(voice_ban, 'utf-8');
@@ -85,6 +109,9 @@
                 index: undefined,
                 type: undefined,
                 steamid: undefined,
+                solo_mmr: undefined,
+                party_mmr: undefined,
+                estimated_mmr: undefined,
             };
         }
 
@@ -192,13 +219,9 @@
 
             let steamIds = [];
 
-            var div = document.getElementById('displayPlayers');
-
-            var html = "";
-
             let steamId64s = [];
 
-            html = "<p>Waiting for new status.</p>";
+            playersLeft = players.length;
 
             if (players.length > 0) {
                 for (var i = 0; i < players.length; i++) {
@@ -279,7 +302,10 @@
                         return callback(null);
                     }
                     playerData = JSON.parse(body);
-                    renderPlayers(playerData.response.players);
+                    for (let i = 0; i < playerData.response.players.length; i++) {
+                        storePlayer(playerData.response.players[i]);
+                    }
+
                 });
 
             }
@@ -287,137 +313,236 @@
 
         }
 
-        function renderPlayers(arr) {
+        function storePlayer(data) {
 
-            for (let i = 0; i < arr.length; i++) {
-                let sid = new SteamID(arr[i].steamid);
-                player = sid.getSteam3RenderedID();
 
-                playersInGame[player].steamid = arr[i].steamid;
+            let sid = new SteamID(data.steamid);
+            player = sid.getSteam3RenderedID();
 
-                playersInGame[player].name = arr[i].personaname;
-                if (arr[i].loccountrycode) {
-                    playersInGame[player].country = arr[i].loccountrycode.toLowerCase();
+
+            playersInGame[player].steamid = data.steamid;
+
+            co(function*() {
+                let checker = new Promise((resolve, reject) => {
+                    request.get('https://api.opendota.com/api/players/' + sid.accountid, (err, response, body) => {
+
+                        try {
+
+                            let res = JSON.parse(body);
+                            let idIndex = sid.getSteam3RenderedID();
+
+                            if (res.solo_competitive_rank != null) {
+                                playersInGame[idIndex].solo_mmr = parseInt(res.solo_competitive_rank);
+                            }
+                            if (res.competitive_rank != null) {
+                                playersInGame[idIndex].party_mmr = parseInt(res.competitive_rank);
+                            }
+                            if (res.mmr_estimate != null && res.mmr_estimate.n != 0) {
+                                playersInGame[idIndex].estimated_mmr = parseInt(res.mmr_estimate.estimate);
+                            }
+                            playersLeft--;
+                        } catch (ex) {
+                            reject(ex);
+                        }
+                    }, reject);
+                });
+
+
+                let res;
+                try {
+                    res = yield checker;
+                } catch (err) {
+                    console.log(err);
                 }
-                if (playerblacklist[player]) {
-                    playersInGame[player].type = playerblacklist[player].type;
-                }
-                if (muted_players.Ban.users[player]) {
-                    playersInGame[player].muted = muted_players.Ban.users[player];
-                }
 
-                if (playersInGame[player].playerIndex < 5) {
-                    let j = playersInGame[player].playerIndex;
-                    radiantPlayers[j] = playersInGame[player];
-                } else {
-                    let j = playersInGame[player].playerIndex - 5;
-                    direPlayers[j] = playersInGame[player];
-                }
+            });
 
-
+            playersInGame[player].name = data.personaname;
+            if (data.loccountrycode) {
+                playersInGame[player].country = data.loccountrycode.toLowerCase();
             }
-            if (arr.length > 0) {
-                insertPlayersToTable();
+            if (playerblacklist[player]) {
+                playersInGame[player].type = playerblacklist[player].type;
+            }
+            if (muted_players.Ban.users[player]) {
+                playersInGame[player].muted = muted_players.Ban.users[player];
             }
 
+            if (playersInGame[player].playerIndex < 5) {
+                let j = playersInGame[player].playerIndex;
+                radiantPlayers[j] = playersInGame[player];
+            } else {
+                let j = playersInGame[player].playerIndex - 5;
+                direPlayers[j] = playersInGame[player];
+            }
 
 
         }
+
+        var controller = setInterval(function() {
+            updateMMRTable()
+        }, 0);
+
+        function updateMMRTable() {
+            if (playersLeft == 0 && done == false) {
+                insertPlayersToTable();
+                clearInterval(controller);
+                done == true;
+            }
+        }
+
+        updateMMRTable();
+
 
         function insertPlayersToTable() {
 
             var divRadiant = document.getElementById('radiantPlayers');
             var divDire = document.getElementById('direPlayers');
 
+            var divStats = document.getElementById('globalStats');
+
             var html = "<p>Radiant</p>";
-            html =
-                "<table><tr><td><font color='#b54403'>Name</font></td><td><font color='#b54403'>Mute Status</font></td><td><font color='#b54403'>Country</font></td><td><font color='#b54403'>Report Status</font></td><td><font color='#b54403'>SteamID64</font></td></tr>";
+            html = html +
+                "<table><tr><td><font color='#9ef7f7'>Name</font></td><td><font color='#9ef7f7'>Mute Status</font></td><td><font color='#9ef7f7'>Country</font></td><td><font color='#9ef7f7'>Report Status</font></td><td><font color='#9ef7f7'>SteamID64</font></td><td><font color='#9ef7f7'>Estimated MMR</font></td></tr>";
 
             for (let i = 0; i < radiantPlayers.length; i++) {
-                html = html + "<tr><td>" + radiantPlayers[i].name + "</td>";
+                html += "<tr><td>" + radiantPlayers[i].name + "</td>";
                 if (radiantPlayers[i].muted) {
                     if (radiantPlayers[i].muted == "1") {
-                        html = html + "<td>Voice Muted</td>";
+                        html += "<td>Voice Muted</td>";
                     } else if (radiantPlayers[i].muted == "2") {
-                        html = html + "<td>Chat Muted</td>";
+                        html += "<td>Chat Muted</td>";
                     } else if (radiantPlayers[i].muted == "3") {
-                        html = html + "<td>Voice and Chat Muted</td>";
+                        html += "<td>Voice and Chat Muted</td>";
                     }
                 } else {
-                    html = html + "<td>None</td>";
+                    html += "<td>None</td>";
                 }
                 if (radiantPlayers[i].country) {
-                    html = html + "<td><img src='http://community.edgecast.steamstatic.com/public/images/countryflags/" + radiantPlayers[i].country + ".gif'></img></td>";
+                    html += "<td><img src='http://community.edgecast.steamstatic.com/public/images/countryflags/" + radiantPlayers[i].country + ".gif'></img></td>";
                 } else {
-                    html = html + "<td></td>";
+                    html += "<td>None</td>";
                 }
 
                 if (radiantPlayers[i].type != null) {
                     if (radiantPlayers[i].type == 0) {
-                        html = html + "<td><font color='yellow'>Own Account</font></td>";
+                        html += "<td><font color='yellow'>Own Account</font></td>";
                     } else if (radiantPlayers[i].type == 1) {
-                        html = html + "<td><font color='cyan'>Friend</font></td>";
+                        html += "<td><font color='cyan'>Friend</font></td>";
                     } else if (radiantPlayers[i].type == 2) {
-                        html = html + "<td><font color='red'>Account Buyer</font></td>";
+                        html += "<td><font color='red'>Account Buyer</font></td>";
                     } else if (radiantPlayers[i].type == 3) {
-                        html = html + "<td><font color='red'>Booster</font></td>";
+                        html += "<td><font color='red'>Booster</font></td>";
                     }
                 } else {
-                    html = html + "<td></td>";
+                    html += "<td>None</td>";
                 }
 
-                html = html + "<td>" + radiantPlayers[i].steamid + "</td>";
+                html += "<td>" + radiantPlayers[i].steamid + "</td>";
 
-                html = html + "</tr>";
+                if (radiantPlayers[i].estimated_mmr) {
+                    html += "<td>" + radiantPlayers[i].estimated_mmr + "</td>";
+                    countRadiantMMR++;
+                    totalRadiantMMR += radiantPlayers[i].estimated_mmr;
+                } else {
+                    html += "<td>None</td>";
+                }
+
+                html += "</tr>";
             }
 
-            html = html + "</table>";
+            html += "</table>";
             divRadiant.innerHTML = html;
 
             var html = "<p>Dire</p>";
-            html =
-                "<table><tr><td><font color='#b54403'>Name</font></td><td><font color='#b54403'>Mute Status</font></td><td><font color='#b54403'>Country</font></td><td><font color='#b54403'>Report Status</font></td><td><font color='#b54403'>SteamID64</font></td></tr>";
+            html = html +
+                "<table><tr><td><font color='#9ef7f7'>Name</font></td><td><font color='#9ef7f7'>Mute Status</font></td><td><font color='#9ef7f7'>Country</font></td><td><font color='#9ef7f7'>Report Status</font></td><td><font color='#9ef7f7'>SteamID64</font></td><td><font color='#9ef7f7'>Estimated MMR</font></td></tr>";
 
             for (let i = 0; i < direPlayers.length; i++) {
-                html = html + "<tr><td>" + direPlayers[i].name + "</td>";
+                html += "<tr><td>" + direPlayers[i].name + "</td>";
                 if (direPlayers[i].muted) {
                     if (direPlayers[i].muted == "1") {
-                        html = html + "<td>Voice Muted</td>";
+                        html += "<td>Voice Muted</td>";
                     } else if (direPlayers[i].muted == "2") {
-                        html = html + "<td>Chat Muted</td>";
+                        html += "<td>Chat Muted</td>";
                     } else if (direPlayers[i].muted == "3") {
-                        html = html + "<td>Voice and Chat Muted</td>";
+                        html += "<td>Voice and Chat Muted</td>";
                     }
                 } else {
-                    html = html + "<td>None</td>";
+                    html += "<td>None</td>";
                 }
                 if (direPlayers[i].country) {
-                    html = html + "<td><img src='http://community.edgecast.steamstatic.com/public/images/countryflags/" + direPlayers[i].country + ".gif'></img></td>"
+                    html += "<td><img src='http://community.edgecast.steamstatic.com/public/images/countryflags/" + direPlayers[i].country + ".gif'></img></td>"
                 } else {
-                    html = html + "<td></td>";
+                    html += "<td>None</td>";
                 }
 
                 if (direPlayers[i].type != null) {
                     if (direPlayers[i].type == 0) {
-                        html = html + "<td><font color='yellow'>Own Account</font></td>";
+                        html += "<td><font color='yellow'>Own Account</font></td>";
                     } else if (direPlayers[i].type == 1) {
-                        html = html + "<td><font color='cyan'>Friend</font></td>";
+                        html += "<td><font color='cyan'>Friend</font></td>";
                     } else if (direPlayers[i].type == 2) {
-                        html = html + "<td><font color='red'>Account Buyer</font></td>";
+                        html += "<td><font color='red'>Account Buyer</font></td>";
                     } else if (direPlayers[i].type == 3) {
-                        html = html + "<td><font color='red'>Booster</font></td>";
+                        html += "<td><font color='red'>Booster</font></td>";
                     }
                 } else {
-                    html = html + "<td></td>";
+                    html += "<td>None</td>";
                 }
 
-                html = html + "<td>" + direPlayers[i].steamid + "</td>";
+                html += "<td>" + direPlayers[i].steamid + "</td>";
 
-                html = html + "</tr>";
+                if (direPlayers[i].estimated_mmr) {
+                    html += "<td>" + direPlayers[i].estimated_mmr + "</td>";
+                    countDireMMR++;
+                    totalDireMMR += direPlayers[i].estimated_mmr;
+                } else {
+                    html += "<td>None</td>";
+                }
+
+                html += "</tr>";
             }
 
-            html = html + "</table>";
+            html += "</table>";
             divDire.innerHTML = html;
+
+            //MMR Part
+
+
+            if (totalDireMMR > 0 && totalRadiantMMR > 0) {
+
+                let factorA = (totalRadiantMMR / countRadiantMMR) / 400;
+                let factorB = (totalDireMMR / countDireMMR) / 400;
+                let factorC = Math.pow(10, factorA);
+                let factorD = Math.pow(10, factorB);
+                let factorE = factorC / (factorC + factorD); //Determines Radiant % chance of winning
+                let factorF = factorD / (factorC + factorD); //Determines Dire % chance of winning
+                let factorG = 50 * (1 - factorE); //Point gain if win for Radiant
+                let factorH = 50 * (0 - factorE); //Point loss if loss for Radiant
+                let factorI = 50 * (1 - factorF); //Point gain if win for Dire
+                let factorJ = 50 * (0 - factorF); //Point loss if loss for Dire
+
+                let gameAvgMMR = (totalRadiantMMR / countRadiantMMR + totalDireMMR / countDireMMR) / 2;
+
+                let acceptableStr = "<font color='green'>Yes</font>";
+
+                if (gameAvgMMR < min_mmr || gameAvgMMR > max_mmr) {
+                    acceptableStr = "<font color='red'>No</font";
+                    dodgeTheGame();
+                }
+
+                html = "<p>Global Stats<p>";
+                html +=
+                    "<table><tr><td><font color='#9ef7f7'>Team</font></td><td><font color='#9ef7f7'>Average MMR</font></td><td><font color='#9ef7f7'>Chance to win</font></td><td><font color='#9ef7f7'>Possible MMR gain</font></td></td><td><font color='#9ef7f7'>Possible MMR loss</font></td><td><font color='#9ef7f7'>Acceptable?</font></td></tr>";
+                html += "<tr><td>Radiant</td><td>" + parseFloat(totalRadiantMMR / countRadiantMMR) + "</td><td>" + parseFloat(factorE * 100).toFixed(2) + "%</td><td>" + parseInt(factorG) + "</td><td>" + parseInt(factorH) + "</td><td></td></tr>";
+                html += "<tr><td>Dire</td><td>" + parseFloat(totalDireMMR / countDireMMR) + "</td><td>" + parseFloat(factorF * 100).toFixed(2) + "%</td><td>" + parseInt(factorI) + "</td><td>" + parseInt(factorJ) + "</td><td></td></tr>";
+                html += "<tr><td>Both Teams</td><td>" + parseFloat(gameAvgMMR) + "</td><td></td><td></td><td></td><td>" + acceptableStr + "</td></tr>";
+                html += "</table>";
+
+                divStats.innerHTML = html;
+
+            }
 
         }
 
