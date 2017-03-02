@@ -233,10 +233,10 @@
             }, function onSetServerLogPath(fileNames) {
                 if (fileNames === undefined) return;
                 let fileName = fileNames[0];
-                if (path.basename(fileName) != 'server_log.txt') {
+                if (path.basename(fileName) != 'voice_ban.dt') {
                     return;
                 }
-                document.getElementById("server_log").value = fileName;
+                document.getElementById("voice_ban").value = fileName;
 
             });
         }
