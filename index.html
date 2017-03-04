@@ -365,7 +365,7 @@
                 playersInGame[player].type = playerblacklist[player].type;
             }
             if (muted_players.Ban.users[player]) {
-                playersInGame[player].muted = muted_players.Ban.users[player];
+                playersInGame[player].muted = muted_players.Ban.users[player].flags;
             }
 
             if (playersInGame[player].playerIndex < 5) {
@@ -424,7 +424,7 @@
                     html += "<td>None</td>";
                 }
 
-                if (radiantPlayers[i].type != null) {
+                if (radiantPlayers[i].type != undefined) {
                     if (radiantPlayers[i].type == 0) {
                         html += "<td><font color='yellow'>Own Account</font></td>";
                     } else if (radiantPlayers[i].type == 1) {
@@ -477,7 +477,7 @@
                     html += "<td>None</td>";
                 }
 
-                if (direPlayers[i].type != null) {
+                if (direPlayers[i].type != undefined) {
                     if (direPlayers[i].type == 0) {
                         html += "<td><font color='yellow'>Own Account</font></td>";
                     } else if (direPlayers[i].type == 1) {

@@ -153,6 +153,19 @@
             direPlayers[i] = newBlankPlayer();
         }
 
+        String.prototype.escapeForJson = function() {
+            return this
+                .replace(/\b/g, "")
+                .replace(/\f/g, "")
+                .replace(/\\/g, "\\")
+                .replace(/\"/g, "\\\"")
+                .replace(/\t/g, "\\t")
+                .replace(/\r/g, "\\r")
+                .replace(/\n/g, "\\n")
+                .replace(/\u2028/g, "\\u2028")
+                .replace(/\u2029/g, "\\u2029");
+        };
+
         //Reloads the page whenever the server_log file is changed
         function StartWatcher(path) {
             var chokidar = require("chokidar");
@@ -309,7 +322,7 @@
                 playersInGame[player].type = playerblacklist[player].type;
             }
             if (muted_players.Ban.users[player]) {
-                playersInGame[player].muted = muted_players.Ban.users[player];
+                playersInGame[player].muted = muted_players.Ban.users[player].flags;
             }
 
             if (playersInGame[player].playerIndex < 5) {
@@ -351,7 +364,7 @@
                     html += "<td>None</td>";
                 }
 
-                if (radiantPlayers[i].type != null) {
+                if (radiantPlayers[i].type != undefined) {
                     if (radiantPlayers[i].type == 0) {
                         html += "<td><font color='yellow'>Own Account</font></td>";
                     } else if (radiantPlayers[i].type == 1) {
@@ -397,7 +410,7 @@
                     html += "<td>None</td>";
                 }
 
-                if (direPlayers[i].type != null) {
+                if (direPlayers[i].type != undefined) {
                     if (direPlayers[i].type == 0) {
                         html += "<td><font color='yellow'>Own Account</font></td>";
                     } else if (direPlayers[i].type == 1) {
@@ -436,7 +449,7 @@
             var notes = document.getElementById("notes").value;
             json[sid.getSteam3RenderedID()] = {
                 type: type,
-                notes: notes
+                notes: notes.escapeForJson()
             };
             fs.writeFileSync("./playerlist.json", JSON.stringify(json));
         }
