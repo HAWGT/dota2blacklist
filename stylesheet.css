@@ -11,11 +11,16 @@ body {
 }
 
 div td {
-  width: 150px;
+    width: 150px;
+}
+
+.buttonCell {
+    text-align: center;
+    margin: 0 auto;
 }
 
 th {
-  font-weight: normal;
+    font-weight: normal;
 }
 
 tr:nth-child(odd) {

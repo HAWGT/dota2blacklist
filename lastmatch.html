@@ -61,7 +61,7 @@
                     <input type="text" id="notes" />
                 </td>
 
-                <td>
+                <td class='buttonCell'>
                     <input type="button" onclick="addEntry()" value="Add Entry" />
                 </td>
             </tr>
@@ -378,8 +378,8 @@
                     html += "<td>None</td>";
                 }
 
-                html += "<td><input type='button' onclick='addToTextBox(\"" + radiantPlayers[i].steamid + "\")' value='+'/></td>";
-                html += "<td><input type='button' onclick='removeFromBL(\"" + radiantPlayers[i].steamid + "\")' value='X'/></td>";
+                html += "<td class='buttonCell'><input type='button' onclick='addToTextBox(\"" + radiantPlayers[i].steamid + "\")' value='+'/></td>";
+                html += "<td class='buttonCell'><input type='button' onclick='removeFromBL(\"" + radiantPlayers[i].steamid + "\")' value='X'/></td>";
 
                 html += "</tr>";
             }
@@ -424,8 +424,8 @@
                     html += "<td>None</td>";
                 }
 
-                html += "<td><input type='button' onclick='addToTextBox(\"" + direPlayers[i].steamid + "\")' value='+'/></td>";
-                html += "<td><input type='button' onclick='removeFromBL(\"" + direPlayers[i].steamid + "\")' value='X'/></td>";
+                html += "<td class='buttonCell'><input type='button' onclick='addToTextBox(\"" + direPlayers[i].steamid + "\")' value='+'/></td>";
+                html += "<td class='buttonCell'><input type='button' onclick='removeFromBL(\"" + direPlayers[i].steamid + "\")' value='X'/></td>";
 
                 html += "</tr>";
             }
