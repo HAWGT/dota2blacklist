@@ -246,6 +246,7 @@
                 var playerlist = document.getElementById("playerlist");
                 var contents = fs.readFileSync("./playerlist.json", 'utf-8');
                 var json = JSON.parse(contents);
+                var html = "<table><tr><th>Resolve Name</th><th>Type</th><th>Notes</th><th>Delete</th><th>SteamID64</th></tr><tr></tr>";
                 for (var player in json) {
                     let sid = new SteamID(player);
                     html += "<tr>";
