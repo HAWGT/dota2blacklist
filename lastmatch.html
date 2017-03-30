@@ -142,6 +142,7 @@
                 solo_mmr: undefined,
                 party_mmr: undefined,
                 estimated_mmr: undefined,
+                opendota: undefined,
             };
         }
 
@@ -311,6 +312,7 @@
             let sid = new SteamID(data.steamid);
             player = sid.getSteam3RenderedID();
 
+            playersInGame[player].opendota = 'https://opendota.com/players/' + sid.accountid;
 
             playersInGame[player].steamid = data.steamid;
 
@@ -343,7 +345,7 @@
 
             var html = "<p>Radiant</p>";
             html = html +
-                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>Add</font></th><th><font color='#9ef7f7'>Remove</font></th></tr></thead>";
+                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>Add</font></th><th><font color='#9ef7f7'>Remove</font></th><th><font color='#9ef7f7'>OPENDOTA</font></th></tr></thead>";
 
             for (let i = 0; i < radiantPlayers.length; i++) {
                 html += "<tr><td>" + radiantPlayers[i].name + "</td>";
@@ -381,6 +383,8 @@
                 html += "<td class='buttonCell'><input type='button' onclick='addToTextBox(\"" + radiantPlayers[i].steamid + "\")' value='+'/></td>";
                 html += "<td class='buttonCell'><input type='button' onclick='removeFromBL(\"" + radiantPlayers[i].steamid + "\")' value='X'/></td>";
 
+                html += "<td><input type='text' value='" + radiantPlayers[i].opendota + "' readonly /></td>";
+
                 html += "</tr>";
             }
 
@@ -389,7 +393,7 @@
 
             var html = "<p>Dire</p>";
             html = html +
-                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>Add</font></th><th><font color='#9ef7f7'>Remove</font></th></tr></thead>";
+                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>Add</font></th><th><font color='#9ef7f7'>Remove</font></th><th><font color='#9ef7f7'>OPENDOTA</font></th></tr></thead>";
 
             for (let i = 0; i < direPlayers.length; i++) {
                 html += "<tr><td>" + direPlayers[i].name + "</td>";
@@ -426,6 +430,8 @@
 
                 html += "<td class='buttonCell'><input type='button' onclick='addToTextBox(\"" + direPlayers[i].steamid + "\")' value='+'/></td>";
                 html += "<td class='buttonCell'><input type='button' onclick='removeFromBL(\"" + direPlayers[i].steamid + "\")' value='X'/></td>";
+
+                html += "<td><input type='text' value='" + direPlayers[i].opendota + "' readonly /></td>";
 
                 html += "</tr>";
             }

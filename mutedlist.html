@@ -131,7 +131,7 @@
             function renderMain() {
 
                 var divMuteList = document.getElementById('mutelist');
-                html = "<table><thead><tr><th>SteamID64</th><th>Account/Player ID</th><th>Mute Status</th><th>Resolve Name</th></tr></thead>";
+                html = "<table><thead><tr><th>SteamID64</th><th>Account/Player ID</th><th>Mute Status</th><th>Resolve Name</th><th>OPENDOTA</th></tr></thead>";
 
                 for (k in muted_players['Ban']['users']) {
                     let sid = new SteamID(k);
@@ -144,7 +144,8 @@
                     } else if (flags == "3") {
                         str = "<td>Voice and Chat Muted</td>";
                     }
-                    html += "<tr><td>" + sid.getSteamID64() + "</td><td>" + sid.accountid + "</td>" + str + "<td class='buttonCell'><input value='!' type='button' onclick='resolve(\"" + sid.getSteamID64() + "\")'/></td></tr>";
+                    html += "<tr><td>" + sid.getSteamID64() + "</td><td>" + sid.accountid + "</td>" + str + "<td class='buttonCell'><input value='!' type='button' onclick='resolve(\"" + sid.getSteamID64() + "\")'/></td>";
+                    html += "<td><input type='text' value='" + 'https://opendota.com/players/' + sid.accountid + "' readonly /></td></tr>";
                 }
 
                 html += "</table>";

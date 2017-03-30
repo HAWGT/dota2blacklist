@@ -119,6 +119,7 @@
                 solo_mmr: undefined,
                 party_mmr: undefined,
                 estimated_mmr: undefined,
+                opendota: undefined,
             };
         }
 
@@ -294,26 +295,26 @@
                 }
 
                 if (friendsTeam.length > 0) {
-                        for (var i = 0; i < friendsTeam.length; i++) {
-                            if (myTeam != friendsTeam[i]) {
-                                dodgeTheGame();
-                            }
+                    for (var i = 0; i < friendsTeam.length; i++) {
+                        if (myTeam != friendsTeam[i]) {
+                            dodgeTheGame();
                         }
                     }
-                    if (buyersTeam.length > 0) {
-                        for (var i = 0; i < buyersTeam.length; i++) {
-                            if (myTeam == buyersTeam[i]) {
-                                dodgeTheGame();
-                            }
+                }
+                if (buyersTeam.length > 0) {
+                    for (var i = 0; i < buyersTeam.length; i++) {
+                        if (myTeam == buyersTeam[i]) {
+                            dodgeTheGame();
                         }
                     }
-                    if (boostersTeam.length > 0) {
-                        for (var i = 0; i < boostersTeam.length; i++) {
-                            if (myTeam != boostersTeam[i]) {
-                                dodgeTheGame();
-                            }
+                }
+                if (boostersTeam.length > 0) {
+                    for (var i = 0; i < boostersTeam.length; i++) {
+                        if (myTeam != boostersTeam[i]) {
+                            dodgeTheGame();
                         }
                     }
+                }
 
                 request.get('http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=' + steamapikey + '&steamids=' + steamId64s.join(), (err, res, body) => {
                     if (err) {
@@ -353,6 +354,8 @@
 
                             let res = JSON.parse(body);
                             let idIndex = sid.getSteam3RenderedID();
+
+                            playersInGame[idIndex].opendota = 'https://opendota.com/players/' + sid.accountid;
 
                             if (res.solo_competitive_rank != null) {
                                 playersInGame[idIndex].solo_mmr = parseInt(res.solo_competitive_rank);
@@ -426,7 +429,7 @@
 
             var html = "<p>Radiant</p>";
             html = html +
-                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>SteamID64</font></th><th><font color='#9ef7f7'>Estimated MMR</font></th></tr></thead>";
+                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>SteamID64</font></th><th><font color='#9ef7f7'>Estimated MMR</font></th><th><font color='#9ef7f7'>OPENDOTA</font></th></tr></thead>";
 
             for (let i = 0; i < radiantPlayers.length; i++) {
                 html += "<tr><td>" + radiantPlayers[i].name + "</td>";
@@ -471,6 +474,8 @@
                     html += "<td>None</td>";
                 }
 
+                html += "<td><input type='text' value='" + radiantPlayers[i].opendota + "' readonly /></td>";
+
                 html += "</tr>";
             }
 
@@ -479,7 +484,7 @@
 
             var html = "<p>Dire</p>";
             html = html +
-                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>SteamID64</font></th><th><font color='#9ef7f7'>Estimated MMR</font></th></tr></thead>";
+                "<table><thead><tr><th><font color='#9ef7f7'>Name</font></th><th><font color='#9ef7f7'>Mute Status</font></th><th><font color='#9ef7f7'>Country</font></th><th><font color='#9ef7f7'>Report Status</font></th><th><font color='#9ef7f7'>SteamID64</font></th><th><font color='#9ef7f7'>Estimated MMR</font></th><th><font color='#9ef7f7'>OPENDOTA</font></th></tr></thead>";
 
             for (let i = 0; i < direPlayers.length; i++) {
                 html += "<tr><td>" + direPlayers[i].name + "</td>";
@@ -523,6 +528,8 @@
                 } else {
                     html += "<td>None</td>";
                 }
+
+                html += "<td><input type='text' value='" + direPlayers[i].opendota + "' readonly /></td>";
 
                 html += "</tr>";
             }
