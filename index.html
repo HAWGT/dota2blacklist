@@ -64,6 +64,7 @@
         var contents = fs.readFileSync("./playerlist.json", 'utf-8');
         var playerblacklist = JSON.parse(contents);
 
+        var fastmode = settings.Fast_Mode;
         var steamapikey = settings.SteamAPIKey;
         var server_log = settings.Server_Log;
         var voice_ban = settings.Voice_Ban;
@@ -146,26 +147,26 @@
 
             // Declare the listeners of the watcher
             watcher
-                .on('add', function(path) {
+                .on('add', function (path) {
                     console.log('File', path, 'has been added');
                 })
-                .on('addDir', function(path) {
+                .on('addDir', function (path) {
                     console.log('Directory', path, 'has been added');
                 })
-                .on('change', function(path) {
+                .on('change', function (path) {
                     console.log('File', path, 'has been changed');
                 })
-                .on('unlink', function(path) {
+                .on('unlink', function (path) {
                     console.log('File', path, 'has been removed');
                 })
-                .on('unlinkDir', function(path) {
+                .on('unlinkDir', function (path) {
                     console.log('Directory', path, 'has been removed');
                 })
-                .on('error', function(error) {
+                .on('error', function (error) {
                     console.log('Error happened', error);
                 })
                 .on('ready', onWatcherReady)
-                .on('raw', function(event, path, details) {
+                .on('raw', function (event, path, details) {
                     // This event should be triggered everytime something happens.
                     if (event == 'change') {
                         location.reload();
@@ -177,7 +178,7 @@
         function parseServerLog() {
             findLast = false;
             let lines = [];
-            fs.readFileSync(server_log).toString().split("\n").forEach(function(line) {
+            fs.readFileSync(server_log).toString().split("\n").forEach(function (line) {
                 if (line === '') return;
                 lines.push(line);
             });
@@ -315,22 +316,31 @@
                         }
                     }
                 }
+                if (!fastmode) {
+                    request.get('http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=' + steamapikey + '&steamids=' + steamId64s.join(), (err, res, body) => {
+                        if (err) {
+                            console.log(err);
+                            return callback(null);
+                        }
+                        if (res.statusCode != 200) {
+                            console.log(res.statusCode, body);
+                            return callback(null);
+                        }
+                        playerData = JSON.parse(body);
+                        for (let i = 0; i < playerData.response.players.length; i++) {
+                            storePlayer(playerData.response.players[i]);
+                        }
 
-                request.get('http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=' + steamapikey + '&steamids=' + steamId64s.join(), (err, res, body) => {
-                    if (err) {
-                        console.log(err);
-                        return callback(null);
+                    });
+                } else {
+                    for (let index = 0; index < players.length; index++) {
+                        let playerInfo = {
+                            steamid: steamId64s[index],
+                            personaname: "Player #" + index
+                        }
+                        storePlayer(playerInfo);
                     }
-                    if (res.statusCode != 200) {
-                        console.log(res.statusCode, body);
-                        return callback(null);
-                    }
-                    playerData = JSON.parse(body);
-                    for (let i = 0; i < playerData.response.players.length; i++) {
-                        storePlayer(playerData.response.players[i]);
-                    }
-
-                });
+                }
 
             }
 
@@ -341,47 +351,49 @@
 
 
             let sid = new SteamID(data.steamid);
-            player = sid.getSteam3RenderedID();
-
+            let player = sid.getSteam3RenderedID();
 
             playersInGame[player].steamid = data.steamid;
 
-            co(function*() {
-                let checker = new Promise((resolve, reject) => {
-                    request.get('https://api.opendota.com/api/players/' + sid.accountid, (err, response, body) => {
+            if (!fastmode) {
+                co(function* () {
+                    let checker = new Promise((resolve, reject) => {
+                        request.get('https://api.opendota.com/api/players/' + sid.accountid, (err, response, body) => {
 
-                        try {
+                            try {
+                                let res = JSON.parse(body);
+                                let idIndex = sid.getSteam3RenderedID();
 
-                            let res = JSON.parse(body);
-                            let idIndex = sid.getSteam3RenderedID();
-
-                            playersInGame[idIndex].opendota = 'https://opendota.com/players/' + sid.accountid;
-
-                            if (res.solo_competitive_rank != null) {
-                                playersInGame[idIndex].solo_mmr = parseInt(res.solo_competitive_rank);
+                                playersInGame[idIndex].opendota = 'https://opendota.com/players/' + sid.accountid;
+                                if (res.solo_competitive_rank != null) {
+                                    playersInGame[idIndex].solo_mmr = parseInt(res.solo_competitive_rank);
+                                }
+                                if (res.competitive_rank != null) {
+                                    playersInGame[idIndex].party_mmr = parseInt(res.competitive_rank);
+                                }
+                                if (res.mmr_estimate != null && res.mmr_estimate.n != 0) {
+                                    playersInGame[idIndex].estimated_mmr = parseInt(res.mmr_estimate.estimate);
+                                }
+                                playersLeft--;
+                            } catch (ex) {
+                                reject(ex);
                             }
-                            if (res.competitive_rank != null) {
-                                playersInGame[idIndex].party_mmr = parseInt(res.competitive_rank);
-                            }
-                            if (res.mmr_estimate != null && res.mmr_estimate.n != 0) {
-                                playersInGame[idIndex].estimated_mmr = parseInt(res.mmr_estimate.estimate);
-                            }
-                            playersLeft--;
-                        } catch (ex) {
-                            reject(ex);
-                        }
-                    }, reject);
+                        }, reject);
+                    });
+
+
+                    let res;
+                    try {
+                        res = yield checker;
+                    } catch (err) {
+                        console.log(err);
+                    }
+
                 });
-
-
-                let res;
-                try {
-                    res = yield checker;
-                } catch (err) {
-                    console.log(err);
-                }
-
-            });
+            } else {
+                playersInGame[player].opendota = 'https://opendota.com/players/' + sid.accountid;
+                playersLeft--;
+            }
 
             playersInGame[player].name = data.personaname;
             if (data.loccountrycode) {
@@ -405,7 +417,7 @@
 
         }
 
-        var controller = setInterval(function() {
+        var controller = setInterval(function () {
             updateMMRTable()
         }, 0);
 
@@ -445,7 +457,7 @@
                     html += "<td>None</td>";
                 }
                 if (radiantPlayers[i].country) {
-                    html += "<td><img src='http://community.edgecast.steamstatic.com/public/images/countryflags/" + radiantPlayers[i].country + ".gif'></img></td>";
+                    html += "<td><img src='https://steamcommunity-a.akamaihd.net/public/images/countryflags/" + radiantPlayers[i].country + ".gif'></img></td>";
                 } else {
                     html += "<td>None</td>";
                 }
@@ -500,7 +512,7 @@
                     html += "<td>None</td>";
                 }
                 if (direPlayers[i].country) {
-                    html += "<td><img src='http://community.edgecast.steamstatic.com/public/images/countryflags/" + direPlayers[i].country + ".gif'></img></td>"
+                    html += "<td><img src='https://steamcommunity-a.akamaihd.net/public/images/countryflags/" + direPlayers[i].country + ".gif'></img></td>"
                 } else {
                     html += "<td>None</td>";
                 }
@@ -539,45 +551,53 @@
 
             //MMR Part
 
+            if (!fastmode) {
+                if (totalDireMMR > 0 && totalRadiantMMR > 0) {
 
-            if (totalDireMMR > 0 && totalRadiantMMR > 0) {
+                    let factorA = (totalRadiantMMR / countRadiantMMR) / 400;
+                    let factorB = (totalDireMMR / countDireMMR) / 400;
+                    let factorC = Math.pow(10, factorA);
+                    let factorD = Math.pow(10, factorB);
+                    let factorE = factorC / (factorC + factorD); //Determines Radiant % chance of winning
+                    let factorF = factorD / (factorC + factorD); //Determines Dire % chance of winning
+                    let factorG = 50 * (1 - factorE); //Point gain if win for Radiant
+                    let factorH = 50 * (0 - factorE); //Point loss if loss for Radiant
+                    let factorI = 50 * (1 - factorF); //Point gain if win for Dire
+                    let factorJ = 50 * (0 - factorF); //Point loss if loss for Dire
 
-                let factorA = (totalRadiantMMR / countRadiantMMR) / 400;
-                let factorB = (totalDireMMR / countDireMMR) / 400;
-                let factorC = Math.pow(10, factorA);
-                let factorD = Math.pow(10, factorB);
-                let factorE = factorC / (factorC + factorD); //Determines Radiant % chance of winning
-                let factorF = factorD / (factorC + factorD); //Determines Dire % chance of winning
-                let factorG = 50 * (1 - factorE); //Point gain if win for Radiant
-                let factorH = 50 * (0 - factorE); //Point loss if loss for Radiant
-                let factorI = 50 * (1 - factorF); //Point gain if win for Dire
-                let factorJ = 50 * (0 - factorF); //Point loss if loss for Dire
+                    let gameAvgMMR = (totalRadiantMMR / countRadiantMMR + totalDireMMR / countDireMMR) / 2;
 
-                let gameAvgMMR = (totalRadiantMMR / countRadiantMMR + totalDireMMR / countDireMMR) / 2;
+                    let acceptableStr = "<font color='green'>Yes</font>";
 
-                let acceptableStr = "<font color='green'>Yes</font>";
+                    if (gameAvgMMR < min_mmr || gameAvgMMR > max_mmr) {
+                        acceptableStr = "<font color='red'>No</font";
+                        dodgeTheGame();
+                    }
 
-                if (gameAvgMMR < min_mmr || gameAvgMMR > max_mmr) {
-                    acceptableStr = "<font color='red'>No</font";
-                    dodgeTheGame();
+                    html = "<p>Global Stats<p>";
+                    html +=
+                        "<table><thead><tr><th><font color='#9ef7f7'>Team</font></th><th><font color='#9ef7f7'>Average MMR</font></th><th><font color='#9ef7f7'>Chance to win</font></th><th><font color='#9ef7f7'>Possible MMR gain</font></th></th><th><font color='#9ef7f7'>Possible MMR loss</font></th><th><font color='#9ef7f7'>Acceptable?</font></th></tr></thead>";
+                    html += "<tr><td>Radiant</td><td>" + parseFloat(totalRadiantMMR / countRadiantMMR) + "</td><td>" + parseFloat(factorE * 100).toFixed(2) + "%</td><td>" + parseInt(factorG) + "</td><td>" + parseInt(factorH) + "</td><td></td></tr>";
+                    html += "<tr><td>Dire</td><td>" + parseFloat(totalDireMMR / countDireMMR) + "</td><td>" + parseFloat(factorF * 100).toFixed(2) + "%</td><td>" + parseInt(factorI) + "</td><td>" + parseInt(factorJ) + "</td><td></td></tr>";
+                    html += "<tr><td>Both Teams</td><td>" + parseFloat(gameAvgMMR) + "</td><td></td><td></td><td></td><td>" + acceptableStr + "</td></tr>";
+                    html += "</table>";
+
+                    divStats.innerHTML = html;
+
                 }
 
-                html = "<p>Global Stats<p>";
-                html +=
-                    "<table><thead><tr><th><font color='#9ef7f7'>Team</font></th><th><font color='#9ef7f7'>Average MMR</font></th><th><font color='#9ef7f7'>Chance to win</font></th><th><font color='#9ef7f7'>Possible MMR gain</font></th></th><th><font color='#9ef7f7'>Possible MMR loss</font></th><th><font color='#9ef7f7'>Acceptable?</font></th></tr></thead>";
-                html += "<tr><td>Radiant</td><td>" + parseFloat(totalRadiantMMR / countRadiantMMR) + "</td><td>" + parseFloat(factorE * 100).toFixed(2) + "%</td><td>" + parseInt(factorG) + "</td><td>" + parseInt(factorH) + "</td><td></td></tr>";
-                html += "<tr><td>Dire</td><td>" + parseFloat(totalDireMMR / countDireMMR) + "</td><td>" + parseFloat(factorF * 100).toFixed(2) + "%</td><td>" + parseInt(factorI) + "</td><td>" + parseInt(factorJ) + "</td><td></td></tr>";
-                html += "<tr><td>Both Teams</td><td>" + parseFloat(gameAvgMMR) + "</td><td></td><td></td><td></td><td>" + acceptableStr + "</td></tr>";
-                html += "</table>";
-
-                divStats.innerHTML = html;
-
             }
+        }
 
+        function checkZero(data) {
+            if (data.length == 1) {
+                data = "0" + data;
+            }
+            return data;
         }
 
         function dodgeTheGame() {
-            var spawn = child_process.exec('cmd.exe /c "taskkill /f /im dota2.exe"', function(err, stdout, stderr) {
+            var spawn = child_process.exec('cmd.exe /c "taskkill /f /im dota2.exe"', function (err, stdout, stderr) {
                 if (err) {
                     console.error(err);
                     if (audio_alerts == true) {
@@ -588,11 +608,35 @@
                 }
                 console.log(stdout);
                 if (audio_alerts == true) {
-                    var msg = new SpeechSynthesisUtterance('Game dodged, close the app, open the game and relaunch the app');
+                    var msg = new SpeechSynthesisUtterance('Game dodged');
+
+                    var today = new Date();
+                    var day = today.getDate() + "";
+                    var month = (today.getMonth() + 1) + "";
+                    var year = today.getFullYear() + "";
+                    var hour = today.getHours() + "";
+                    var minutes = today.getMinutes() + "";
+                    var seconds = today.getSeconds() + "";
+
+                    day = checkZero(day);
+                    month = checkZero(month);
+                    year = checkZero(year);
+                    hour = checkZero(hour);
+                    minutes = checkZero(minutes);
+                    seconds = checkZero(seconds);
+
+                    let logEntry = day + '/' + month + '/' + year + " - " + hour + ":" + minutes + ":" + seconds + ": loopback:1\n"
+
+                    fs.appendFileSync(server_log, logEntry);
+
                     window.speechSynthesis.speak(msg);
                 }
             });
         }
+
+
+
+
 
         //Runs CORE
         renderMain();
